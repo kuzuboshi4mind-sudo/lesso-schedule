@@ -18,7 +18,8 @@ iCloud の Numbers で手入力していた表(「ジュンのスケジュール
   - **管理用キー**(service_role / secret key)は、コードにも Git にも絶対に入れない
 - **無料枠で運用する**。サービスの条件は変わるので、関係する作業の前に公式ページで最新を確認する
 - **作り**:HTML / CSS / JavaScript だけ。フレームワークやビルド(公開前のコード変換)は使わない
-- **変更の取り込み先**:`main` ブランチ。プッシュすると Cloudflare Pages が自動で公開する
+- **変更の取り込み先**:`main` ブランチ。プッシュすると Cloudflare が自動で公開する
+- **公開 URL**:https://lesso-schedule.kuzuboshi4mind.workers.dev
 
 ## 2. 使う人と端末
 
@@ -77,7 +78,7 @@ iCloud の Numbers で手入力していた表(「ジュンのスケジュール
 
 | 項目 | 決定 |
 |---|---|
-| 公開先 | **Cloudflare Pages**(無料で商用利用も可。Vercel の無料プランは非商用に限られるため) |
+| 公開先 | **Cloudflare Workers**(静的ファイルの公開。無料で商用利用も可。Vercel の無料プランは非商用に限られるため。当初は Pages の予定だったが、Cloudflare の画面の案内に沿って Workers で作成した) |
 | 15分・20分のレッスン | 開始時刻は15分単位。1マスに2件あれば上下に分けて表示 |
 | 60分のレッスン | 2マスをつなげた1つの帯で表示 |
 | 集計対象 | 確約のみ合計。仮は参考として別に表示。キャンセルは除外 |
@@ -102,7 +103,7 @@ iCloud の Numbers で手入力していた表(「ジュンのスケジュール
 |---|---|
 | 画面 | HTML / CSS / JavaScript(ビルドなし) |
 | データ保存・ログイン | Supabase(無料プラン) |
-| 公開 | Cloudflare Pages(GitHub の `main` に連動して自動公開) |
+| 公開 | Cloudflare Workers(GitHub の `main` に連動して自動公開)<br>https://lesso-schedule.kuzuboshi4mind.workers.dev |
 
 ### フォルダ構成(予定。手順が進むと増える)
 
@@ -149,14 +150,15 @@ lesso-schedule/
   - DB 500MB、ログインユーザーは月5万人まで、プロジェクトは2つまで
   - **7日間 DB へのアクセスがないと一時停止**する。データは消えず、管理画面から再開できる
   - 対策:月1回バックアップを書き出す
-- **Cloudflare Pages の無料プラン**
+- **Cloudflare Workers の無料プラン**
   - 商用利用も可
+  - 1日10万リクエストまで(1人で使う分には十分)
 
 ## 6. 作業手順と進捗
 
 | 手順 | 内容 | 動作確認 | 状態 |
 |---|---|---|---|
-| 0 | CLAUDE.md 作成、GitHub と Cloudflare Pages の連携 | iPad で公開 URL を開くと「準備中」の画面が出る | **作業中** |
+| 0 | CLAUDE.md 作成、GitHub と Cloudflare の連携 | iPad で公開 URL を開くと「準備中」の画面が出る | **作業中**(本人の表示確認待ち) |
 | 1 | 月表の枠(30分刻み×日付、土日祝の色、今日の強調、見出しの固定、月の切り替え) | 月が切り替わり、日数と曜日が正しい | 未着手 |
 | 2 | 予定の入力(生徒名・長さ・種類・メモ)、日ごとのメモ | 登録した予定が表に出る | 未着手 |
 | 3 | 仮 / 確約・キャンセルの表示 | 切り替えで見た目が変わる | 未着手 |
@@ -171,3 +173,4 @@ lesso-schedule/
 ### 作業ログ
 
 - 2026-10-08 手順0:CLAUDE.md と仮のトップページ(index.html)を作成
+- 2026-10-11 手順0:Cloudflare Workers で公開(https://lesso-schedule.kuzuboshi4mind.workers.dev)
