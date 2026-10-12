@@ -1,11 +1,11 @@
 // 月表(30分刻み×日付)を描く
 import { holidayName } from './holidays.js';
 
-export const START_HOUR = 8;      // 表の最初の時刻 8:00
-export const END_HOUR = 23;       // 最後の行は 23:30
+export const START_HOUR = 6;      // 表の最初の時刻 6:00
+export const END_HOUR = 23;       // 最後の行は 23:30(24:00まで)
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
-// 8:00, 8:30, ... 23:30 の一覧
+// 6:00, 6:30, ... 23:30 の一覧
 export function timeSlots() {
   const slots = [];
   for (let h = START_HOUR; h <= END_HOUR; h++) {

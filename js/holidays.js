@@ -1,4 +1,4 @@
-// 日本の祝日を計算で求める(2022年以降の法律に合わせたルール)
+// 日本の祝日と、独自のお休み(年末3日間)を計算で求める(祝日は2022年以降の法律に合わせたルール)
 // 祝日一覧をネットから取らずに済むので、オフラインでも動く
 
 // 指定した月の「第n月曜日」の日付(1〜31)を返す
@@ -58,6 +58,9 @@ function calcHolidays(year) {
     do { d.setDate(d.getDate() + 1); } while (h[key(d.getMonth() + 1, d.getDate())]);
     if (d.getFullYear() === year) h[key(d.getMonth() + 1, d.getDate())] = '振替休日';
   }
+
+  // 年末の3日間(12/29〜31)はお休み
+  for (const day of [29, 30, 31]) h[key(12, day)] = '年末休み';
   return h;
 }
 
