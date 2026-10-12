@@ -3,39 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   <title>レッスンスケジュール</title>
-  <style>
-    /* 手順0の仮ページ。手順1で本物の画面に置き換える */
-    :root {
-      --bg: #f2f8f7;
-      --text: #1d3b38;
-      --accent: #138a7e;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0f1d1c;
-        --text: #dcefeb;
-        --accent: #4fc4b6;
-      }
-    }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
-      text-align: center;
-    }
-    h1 { color: var(--accent); font-size: 1.6rem; margin: 0 0 .5rem; }
-    p { margin: 0; opacity: .8; }
-  </style>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
-  <main>
-    <h1>レッスンスケジュール</h1>
-    <p>準備中です(手順0)</p>
+  <!-- 上の帯:月の表示と切り替えボタン -->
+  <header class="app-header">
+    <h1 id="month-title" class="month-title">----年--月</h1>
+    <nav class="month-nav" aria-label="月の切り替え">
+      <button type="button" id="prev-month" class="btn" aria-label="前の月">◀ 前月</button>
+      <button type="button" id="this-month" class="btn btn-primary">今月</button>
+      <button type="button" id="next-month" class="btn" aria-label="次の月">次月 ▶</button>
+    </nav>
+  </header>
+
+  <!-- 月表。この枠の中だけが縦横にスクロールする -->
+  <main id="calendar-scroll" class="calendar-scroll">
+    <table id="calendar" class="calendar"></table>
   </main>
 </body>
 </html>

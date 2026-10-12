@@ -1,0 +1,211 @@
+/* =========================================================
+   色の設定(ここを変えるとアプリ全体の色が変わる)
+   ========================================================= */
+:root {
+  --bg: #f3f8f7;            /* 背景 */
+  --surface: #ffffff;       /* 表のマス */
+  --text: #1c2b2a;          /* 文字 */
+  --muted: #6b7f7c;         /* 薄い文字 */
+  --accent: #128679;        /* 青緑(基調の色) */
+  --accent-text: #ffffff;   /* 青緑の上の文字 */
+  --line: #d3e2df;          /* 罫線 */
+  --line-strong: #a9c4bf;   /* 1時間ごとの罫線 */
+  --head: #e3f1ee;          /* 見出しのマス */
+  --memo: #f0f7f5;          /* 日ごとのメモ行 */
+  --holiday: #dcf0fa;       /* 土日・祝日の列(水色) */
+  --holiday-head: #c4e6f6;
+  --today: #fff4b8;         /* 今日の列(黄色) */
+  --today-head: #f6d84a;
+  --sun: #d0473c;           /* 日曜・祝日の文字 */
+  --sat: #2f6fd0;           /* 土曜の文字 */
+
+  /* 大きさ */
+  --time-col: 56px;         /* 時刻の列の幅 */
+  --day-col: 58px;          /* 日付の列の幅 */
+  --row: 30px;              /* 30分の行の高さ */
+  --h-date: 34px;           /* 日付の行の高さ */
+  --h-week: 26px;           /* 曜日の行の高さ */
+  --h-memo: 40px;           /* メモの行の高さ */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1716;
+    --surface: #141f1e;
+    --text: #e1eeec;
+    --muted: #8ea5a1;
+    --accent: #3fbfb0;
+    --accent-text: #08201d;
+    --line: #263937;
+    --line-strong: #3d5753;
+    --head: #1a2c2a;
+    --memo: #172625;
+    --holiday: #142e3a;
+    --holiday-head: #1b3e4e;
+    --today: #39340f;
+    --today-head: #7a6a12;
+    --sun: #ff8a7e;
+    --sat: #84b3ff;
+  }
+}
+
+/* =========================================================
+   全体の配置
+   ========================================================= */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;           /* 画面の高さぴったり */
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 上の帯 */
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+.month-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.month-nav {
+  display: flex;
+  gap: 8px;
+}
+
+/* ボタン(指で押しやすい大きさ:高さ44px以上) */
+.btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+/* =========================================================
+   月表
+   ========================================================= */
+/* 表の枠。この中だけ縦横にスクロールする */
+.calendar-scroll {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.calendar {
+  border-collapse: separate;   /* 見出しの固定をきれいにするため */
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 12px;
+  background: var(--surface);
+}
+
+.calendar th,
+.calendar td {
+  width: var(--day-col);
+  min-width: var(--day-col);
+  max-width: var(--day-col);
+  height: var(--row);
+  padding: 0 2px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  vertical-align: middle;
+  background: var(--surface);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ---- 上に固定する3行(日付・曜日・メモ) ---- */
+.calendar thead th {
+  position: sticky;
+  z-index: 2;
+  background: var(--head);
+}
+.calendar .row-date th { top: 0; height: var(--h-date); font-size: 15px; font-weight: 700; }
+.calendar .row-week th { top: var(--h-date); height: var(--h-week); font-weight: 600; }
+.calendar .row-memo th {
+  top: calc(var(--h-date) + var(--h-week));
+  height: var(--h-memo);
+  background: var(--memo);
+  font-weight: 400;
+  border-bottom: 2px solid var(--line-strong);
+  white-space: normal;
+  line-height: 1.2;
+}
+
+/* ---- 左に固定する時刻の列 ---- */
+.calendar .time-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: var(--time-col);
+  min-width: var(--time-col);
+  max-width: var(--time-col);
+  background: var(--head);
+  font-variant-numeric: tabular-nums;
+  border-right: 2px solid var(--line-strong);
+}
+/* 左上の角は、縦にも横にも固定 */
+.calendar thead .time-col { z-index: 3; }
+
+.calendar tbody .time-col { color: var(--muted); }
+.calendar tbody tr.hour .time-col { color: var(--text); font-weight: 700; }
+/* 1時間ごとの区切り線を少し濃く */
+.calendar tbody tr.hour td,
+.calendar tbody tr.hour .time-col { border-top: 1px solid var(--line-strong); }
+
+/* ---- 曜日の文字色 ---- */
+.calendar .sun,
+.calendar .holiday-name { color: var(--sun); }
+.calendar .sat { color: var(--sat); }
+
+.holiday-name {
+  display: block;
+  font-size: 10px;
+}
+
+/* ---- 土日・祝日の列(水色) ---- */
+.calendar td.off { background: var(--holiday); }
+.calendar thead th.off { background: var(--holiday-head); }
+.calendar thead .row-memo th.off { background: var(--holiday); }
+
+/* ---- 今日の列(黄色。土日より優先) ---- */
+.calendar td.today { background: var(--today); }
+.calendar thead th.today { background: var(--today-head); }
+.calendar thead .row-memo th.today { background: var(--today); }

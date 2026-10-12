@@ -1,0 +1,5 @@
+# 公開しないファイル(Cloudflare が配信しない)
+CLAUDE.md
+.gitignore
+.assetsignore
+supabase
