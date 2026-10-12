@@ -50,21 +50,106 @@ function weekdayClass(d) {
   return '';
 }
 
+// 文字を画面に出すときの安全対策(< や & をそのまま表示する)
+export function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// "13:15" → 795(0時からの分)
+export function toMinutes(time) {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// 795 → "13:15"
+export function fromMinutes(min) {
+  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+}
+
+// 背景色に合わせて、読みやすい文字色(黒か白)を選ぶ
+export function textColorFor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '#1c2b2a' : '#ffffff';
+}
+
+// 同じ日に時間が重なるレッスンを、横に並べるための位置を決める
+// 戻り値:Map(レッスンのid → { lane:何列目, lanes:全部で何列 })
+function layoutLanes(lessons) {
+  const result = new Map();
+  const sorted = [...lessons].sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
+  let group = [];
+  let groupEnd = -1;
+  const flush = () => {
+    const laneEnds = [];
+    for (const l of group) {
+      const start = toMinutes(l.start);
+      let lane = laneEnds.findIndex(end => end <= start);
+      if (lane < 0) lane = laneEnds.length;
+      laneEnds[lane] = start + l.duration;
+      result.set(l.id, { lane, lanes: 0 });
+    }
+    for (const l of group) result.get(l.id).lanes = laneEnds.length;
+    group = [];
+  };
+  for (const l of sorted) {
+    const start = toMinutes(l.start);
+    if (group.length && start >= groupEnd) flush();
+    group.push(l);
+    groupEnd = Math.max(groupEnd, start + l.duration);
+  }
+  flush();
+  return result;
+}
+
+// レッスン1件のブロック(マスの中に重ねて表示する色付きの帯)
+function lessonBlock(lesson, type, pos) {
+  const offset = toMinutes(lesson.start) % 30;      // マスの上端から何分ずれているか
+  const color = type ? type.color : '#9e9e9e';
+  const width = 100 / pos.lanes;
+  const memoMark = lesson.memo ? '<span class="lesson-memo-mark">✎</span>' : '';
+  const durationLabel = lesson.duration !== 30 ? `<span class="lesson-dur">${lesson.duration}分</span>` : '';
+  const tip = `${lesson.start}〜 ${lesson.duration}分 ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
+  return `<button type="button" class="lesson${lesson.duration <= 20 ? ' short' : ''}" data-id="${escapeHtml(lesson.id)}"
+    title="${escapeHtml(tip)}"
+    style="--offset:${offset};--dur:${lesson.duration};left:${pos.lane * width}%;width:${width}%;background:${color};color:${textColorFor(color)}">
+    <span class="lesson-name">${escapeHtml(lesson.student || '(名前なし)')}</span>${durationLabel}${memoMark}
+  </button>`;
+}
+
 // 表の中身を作って table 要素に入れる
-export function renderCalendar(table, year, month) {
+// data = { lessons:[...], dayNotes:{日付:文字}, types:[...] }
+export function renderCalendar(table, year, month, data = {}) {
+  const { lessons = [], dayNotes = {}, types = [] } = data;
   const days = monthDays(year, month);
+  const typeById = Object.fromEntries(types.map(t => [t.id, t]));
+
+  // レッスンを「日付|30分のマスの時刻」ごとに分けておく
+  const lanesByDate = {};
+  for (const d of days) lanesByDate[d.key] = layoutLanes(lessons.filter(l => l.date === d.key));
+  const blocksBySlot = {};
+  for (const l of lessons) {
+    const slot = fromMinutes(Math.floor(toMinutes(l.start) / 30) * 30);
+    const k = `${l.date}|${slot}`;
+    (blocksBySlot[k] ||= []).push(lessonBlock(l, typeById[l.typeId], lanesByDate[l.date].get(l.id)));
+  }
 
   const dateRow = days.map(d =>
     `<th class="${colClass(d)} ${weekdayClass(d)}" data-date="${d.key}">${d.day}</th>`).join('');
   const weekRow = days.map(d =>
     `<th class="${colClass(d)} ${weekdayClass(d)}" data-date="${d.key}">${WEEKDAYS[d.weekday]}</th>`).join('');
-  // 日ごとのメモ行(手順2で入力できるようにする)。今は祝日名だけ出す
-  const memoRow = days.map(d =>
-    `<th class="${colClass(d)}" data-date="${d.key}">${d.holiday ? `<span class="holiday-name">${d.holiday}</span>` : ''}</th>`).join('');
+  // 日ごとのメモ行。タップで入力できる。祝日名もここに出す
+  const memoRow = days.map(d => {
+    const holiday = d.holiday ? `<span class="holiday-name">${d.holiday}</span>` : '';
+    const note = dayNotes[d.key] ? `<span class="day-note">${escapeHtml(dayNotes[d.key])}</span>` : '';
+    return `<th class="day-memo ${colClass(d)}" data-date="${d.key}">${holiday}${note}</th>`;
+  }).join('');
 
   const bodyRows = timeSlots().map(time => {
-    const cells = days.map(d =>
-      `<td class="${colClass(d)}" data-date="${d.key}" data-time="${time}"></td>`).join('');
+    const cells = days.map(d => {
+      const blocks = blocksBySlot[`${d.key}|${time}`];
+      return `<td class="${colClass(d)}" data-date="${d.key}" data-time="${time}">${blocks ? `<div class="slot">${blocks.join('')}</div>` : ''}</td>`;
+    }).join('');
     const isHour = time.endsWith(':00');
     return `<tr class="${isHour ? 'hour' : ''}"><th class="time-col" scope="row">${time}</th>${cells}</tr>`;
   }).join('');

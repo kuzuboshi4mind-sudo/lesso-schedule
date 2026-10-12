@@ -18,11 +18,12 @@
   --today-head: #f6d84a;
   --sun: #d0473c;           /* 日曜・祝日の文字 */
   --sat: #2f6fd0;           /* 土曜の文字 */
+  --danger: #c0392b;        /* 削除ボタン */
 
   /* 大きさ */
   --time-col: 56px;         /* 時刻の列の幅 */
   --day-col: 58px;          /* 日付の列の幅 */
-  --row: 30px;              /* 30分の行の高さ */
+  --row: 34px;              /* 30分の行の高さ */
   --h-date: 34px;           /* 日付の行の高さ */
   --h-week: 26px;           /* 曜日の行の高さ */
   --h-memo: 40px;           /* メモの行の高さ */
@@ -46,6 +47,7 @@
     --today-head: #7a6a12;
     --sun: #ff8a7e;
     --sat: #84b3ff;
+    --danger: #ff7b6e;
   }
 }
 
@@ -186,9 +188,9 @@ body {
 
 .calendar tbody .time-col { color: var(--muted); }
 .calendar tbody tr.hour .time-col { color: var(--text); font-weight: 700; }
-/* 1時間ごとの区切り線を少し濃く */
-.calendar tbody tr.hour td,
-.calendar tbody tr.hour .time-col { border-top: 1px solid var(--line-strong); }
+/* 1時間ごとの区切り線を少し濃く(:30 の行の下線を濃くする。行の高さを変えないため) */
+.calendar tbody tr:not(.hour) td,
+.calendar tbody tr:not(.hour) .time-col { border-bottom-color: var(--line-strong); }
 
 /* ---- 曜日の文字色 ---- */
 .calendar .sun,
@@ -209,3 +211,217 @@ body {
 .calendar td.today { background: var(--today); }
 .calendar thead th.today { background: var(--today-head); }
 .calendar thead .row-memo th.today { background: var(--today); }
+
+/* 表のマスはタップできる */
+.calendar tbody td { cursor: pointer; overflow: visible; padding: 0; vertical-align: top; }
+.calendar th.day-memo { cursor: pointer; }
+
+/* 日ごとのメモ */
+.day-note {
+  display: block;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================
+   予定(レッスン)のブロック
+   ========================================================= */
+/* マスの中の入れ物。ブロックはここを基準に、開始時刻と長さに合わせて置く */
+.slot {
+  position: relative;
+  height: 0;              /* マスの高さを変えないよう、高さ0の目印にする */
+  pointer-events: none;   /* 空いた所のタップは下のマスに通す */
+}
+
+.lesson {
+  position: absolute;
+  top: calc(var(--offset) / 30 * var(--row) + 1px);
+  height: calc(var(--dur) / 30 * var(--row) - 2px);
+  margin: 0;
+  padding: 1px 3px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.15;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.lesson:active { filter: brightness(0.92); }
+.lesson-name {
+  max-width: 100%;
+  font-weight: 700;
+  white-space: normal;      /* 幅がせまいときは折り返す */
+  word-break: break-all;
+  overflow: hidden;
+}
+/* 短いレッスン(15分・20分)は1行だけ */
+.lesson.short .lesson-name {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lesson-dur { font-size: 10px; opacity: 0.85; }
+.lesson-memo-mark {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  font-size: 9px;
+}
+/* 短いレッスン(15分・20分)は名前だけ */
+.lesson.short .lesson-dur { display: none; }
+.lesson.short { font-size: 11px; padding-top: 0; padding-bottom: 0; }
+
+/* =========================================================
+   種類の色の見本(上の帯)
+   ========================================================= */
+.type-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+.type-legend li { display: flex; align-items: center; gap: 4px; }
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* =========================================================
+   入力画面(ダイアログ)
+   ========================================================= */
+.sheet {
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 20px;
+  border: none;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+.sheet-small { width: min(420px, calc(100vw - 24px)); }
+.sheet::backdrop { background: rgba(0, 0, 0, 0.4); }
+.sheet h2 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+  color: var(--accent);
+}
+
+.field {
+  display: block;
+  margin: 0 0 14px;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+.field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* 入力欄(iPhone で勝手に拡大されないよう 16px 以上) */
+.sheet input[type="text"],
+.sheet input[type="date"],
+.sheet select,
+.sheet textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.sheet textarea { resize: vertical; }
+
+/* 選択ボタン(長さ・種類) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; }
+.chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.chip span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--line-strong);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+}
+.chip input:checked + span {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.chip input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* 種類のボタン:左に色の丸。選ぶとその色で塗られる */
+.type-chip span::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--type-color);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.type-chip input:checked + span {
+  border-color: var(--type-color);
+  background: var(--type-color);
+  color: var(--type-text);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--type-color);
+}
+.type-chip input:checked + span::before { border-color: var(--type-text); }
+
+.form-error {
+  min-height: 1.2em;
+  margin: 0 0 8px;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.sheet-actions .spacer { flex: 1; }
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn[hidden] { display: none; }

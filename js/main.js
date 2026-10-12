@@ -1,12 +1,16 @@
 // アプリの起動と、月の切り替え
-import { renderCalendar } from './calendar.js';
+import { renderCalendar, escapeHtml } from './calendar.js';
+import * as store from './store.js';
+import { openNewLesson, openExistingLesson, openDayNote, setOnChanged } from './editor.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
 const title = document.getElementById('month-title');
+const legend = document.getElementById('type-legend');
 
 // 表示中の年と月(month は 1〜12)
 let current = readMonthFromUrl() || thisMonth();
+let dayNotes = {};
 
 function thisMonth() {
   const now = new Date();
@@ -22,20 +26,42 @@ function readMonthFromUrl() {
   return { year: Number(m[1]), month };
 }
 
-function show() {
-  title.textContent = `${current.year}年${current.month}月`;
-  document.title = `${current.month}月 レッスンスケジュール`;
-  history.replaceState(null, '', `#${current.year}-${String(current.month).padStart(2, '0')}`);
-  renderCalendar(table, current.year, current.month);
-  scrollToToday();
+// 表を描き直す(keepScroll:スクロール位置をそのままにする)
+async function show({ keepScroll = false } = {}) {
+  const { year, month } = current;
+  title.textContent = `${year}年${month}月`;
+  document.title = `${month}月 レッスンスケジュール`;
+  history.replaceState(null, '', `#${year}-${String(month).padStart(2, '0')}`);
+
+  const [lessons, notes, types] = await Promise.all([
+    store.getLessons(year, month), store.getDayNotes(year, month), store.getTypes(),
+  ]);
+  dayNotes = notes;
+  const { scrollLeft, scrollTop } = scroller;
+  renderCalendar(table, year, month, { lessons, dayNotes, types });
+  renderLegend(types);
+  if (keepScroll) {
+    scroller.scrollLeft = scrollLeft;
+    scroller.scrollTop = scrollTop;
+  } else {
+    scrollToToday();
+  }
+}
+
+function renderLegend(types) {
+  legend.innerHTML = types.map(t =>
+    `<li><span class="legend-swatch" style="background:${t.color}"></span>${escapeHtml(t.name)}</li>`).join('');
 }
 
 // 今日の列が見えるように横スクロールする(今日がない月は左端へ)
+// 縦は 8:00 あたりから見えるようにする
 function scrollToToday() {
   const todayCell = table.querySelector('thead th.today');
   const timeColWidth = table.querySelector('.time-col').offsetWidth;
   scroller.scrollLeft = todayCell ? Math.max(0, todayCell.offsetLeft - timeColWidth - todayCell.offsetWidth * 2) : 0;
-  scroller.scrollTop = 0;
+  const eight = table.querySelector('td[data-time="8:00"]');
+  const headHeight = table.querySelector('thead').offsetHeight;
+  scroller.scrollTop = eight ? eight.offsetTop - headHeight : 0;
 }
 
 function moveMonth(diff) {
@@ -50,5 +76,18 @@ document.getElementById('this-month').addEventListener('click', () => {
   current = thisMonth();
   show();
 });
+
+// 表のタップ:予定のブロック → 編集、空いたマス → 新規、「予定」の行 → 日ごとのメモ
+table.addEventListener('click', e => {
+  const lesson = e.target.closest('.lesson');
+  if (lesson) return openExistingLesson(lesson.dataset.id);
+  const memo = e.target.closest('th.day-memo');
+  if (memo) return openDayNote(memo.dataset.date, dayNotes[memo.dataset.date]);
+  const cell = e.target.closest('td[data-date]');
+  if (cell) return openNewLesson(cell.dataset.date, cell.dataset.time);
+});
+
+// 保存・削除したら、スクロール位置はそのままで表を描き直す
+setOnChanged(() => show({ keepScroll: true }));
 
 show();

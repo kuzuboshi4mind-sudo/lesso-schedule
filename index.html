@@ -17,11 +17,78 @@
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
       <button type="button" id="next-month" class="btn" aria-label="次の月">次月 ▶</button>
     </nav>
+    <!-- 種類と色の見本 -->
+    <ul id="type-legend" class="type-legend" aria-label="種類の色"></ul>
   </header>
 
   <!-- 月表。この枠の中だけが縦横にスクロールする -->
   <main id="calendar-scroll" class="calendar-scroll">
     <table id="calendar" class="calendar"></table>
   </main>
+
+  <!-- 予定(レッスン)の入力画面 -->
+  <dialog id="lesson-dialog" class="sheet">
+    <form id="lesson-form" method="dialog">
+      <h2 id="lesson-dialog-title">予定を追加</h2>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">日付</span>
+          <input type="date" id="lesson-date" required>
+        </label>
+        <label class="field">
+          <span class="field-label">開始</span>
+          <select id="lesson-start"></select>
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field-label">生徒名</span>
+        <input type="text" id="lesson-student" list="student-names" autocomplete="off" placeholder="例:山田">
+        <datalist id="student-names"></datalist>
+      </label>
+
+      <fieldset class="field">
+        <legend class="field-label">長さ</legend>
+        <div id="lesson-durations" class="chips"></div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend class="field-label">種類</legend>
+        <div id="lesson-types" class="chips"></div>
+      </fieldset>
+
+      <label class="field">
+        <span class="field-label">メモ</span>
+        <textarea id="lesson-memo" rows="2" placeholder="例:発表会の曲を練習"></textarea>
+      </label>
+
+      <p id="lesson-error" class="form-error" role="alert"></p>
+
+      <div class="sheet-actions">
+        <button type="button" id="lesson-delete" class="btn btn-danger">削除</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>やめる</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 日ごとのメモ(「予定」の行)の入力画面 -->
+  <dialog id="note-dialog" class="sheet sheet-small">
+    <form id="note-form" method="dialog">
+      <h2><span id="note-date"></span> の予定</h2>
+      <label class="field">
+        <span class="field-label">メモ(例:サンパル、休み、ライブ)</span>
+        <input type="text" id="note-text" autocomplete="off">
+      </label>
+      <div class="sheet-actions">
+        <button type="button" id="note-clear" class="btn btn-danger">消す</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>やめる</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>
