@@ -283,13 +283,78 @@ body {
 .lesson.short { font-size: 11px; padding-top: 0; padding-bottom: 0; }
 
 /* =========================================================
-   種類の色の見本(上の帯)
+   予定の状態:確約=濃い色+◯、仮=薄い色+点線、キャンセル=灰色+×
    ========================================================= */
+.lesson.confirmed {
+  background: var(--type-color);
+}
+.lesson.tentative {
+  /* 種類の色を白(ダークモードでは黒)に3割だけ混ぜた薄い色 */
+  background: color-mix(in srgb, var(--type-color) 30%, var(--surface));
+  border: 2px dashed var(--type-color);
+  color: var(--text);
+}
+.lesson.tentative .lesson-name { font-weight: 500; }
+.lesson.cancelled {
+  background: repeating-linear-gradient(-45deg, var(--surface) 0 4px, var(--head) 4px 8px);
+  border: 1px solid color-mix(in srgb, var(--type-color) 60%, var(--surface));
+  color: var(--muted);
+}
+.lesson.cancelled .lesson-name { text-decoration: line-through; }
+.lesson-mark { font-weight: 900; font-size: 0.95em; }
+.lesson.confirmed .lesson-mark { margin-left: 1px; }
+.lesson.cancelled .lesson-mark {
+  color: var(--danger);
+  margin-right: 1px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+/* 状態の選択ボタン:選んだときの色 */
+.chip.status-confirmed input:checked + span { background: var(--accent); border-color: var(--accent); }
+.chip.status-tentative input:checked + span {
+  background: color-mix(in srgb, var(--accent) 25%, var(--surface));
+  border: 2px dashed var(--accent);
+  color: var(--text);
+}
+.chip.status-cancelled input:checked + span { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* =========================================================
+   種類の色の見本・状態の見本(上の帯)
+   ========================================================= */
+.legends {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  width: 100%;
+}
+.status-legend {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+.status-legend li { display: flex; align-items: center; gap: 4px; }
+.legend-lesson {
+  --type-color: #4caf50;
+  position: static;
+  display: inline-flex;
+  flex-direction: row;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.legend-lesson.confirmed { color: #fff; }
 .type-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
-  width: 100%;
   margin: 0;
   padding: 0;
   list-style: none;

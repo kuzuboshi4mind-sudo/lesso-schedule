@@ -17,8 +17,16 @@
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
       <button type="button" id="next-month" class="btn" aria-label="次の月">次月 ▶</button>
     </nav>
-    <!-- 種類と色の見本 -->
-    <ul id="type-legend" class="type-legend" aria-label="種類の色"></ul>
+    <div class="legends">
+      <!-- 種類と色の見本 -->
+      <ul id="type-legend" class="type-legend" aria-label="種類の色"></ul>
+      <!-- 状態の見本 -->
+      <ul class="status-legend" aria-label="状態の見本">
+        <li><span class="legend-lesson lesson confirmed">名前<span class="lesson-mark">○</span></span>確約</li>
+        <li><span class="legend-lesson lesson tentative">名前</span>仮</li>
+        <li><span class="legend-lesson lesson cancelled"><span class="lesson-mark">×</span><span class="lesson-name">名前</span></span>キャンセル</li>
+      </ul>
+    </div>
   </header>
 
   <!-- 月表。この枠の中だけが縦横にスクロールする -->
@@ -47,6 +55,11 @@
         <input type="text" id="lesson-student" list="student-names" autocomplete="off" placeholder="例:山田">
         <datalist id="student-names"></datalist>
       </label>
+
+      <fieldset class="field">
+        <legend class="field-label">状態</legend>
+        <div id="lesson-statuses" class="chips"></div>
+      </fieldset>
 
       <fieldset class="field">
         <legend class="field-label">長さ</legend>

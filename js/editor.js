@@ -24,6 +24,7 @@ const f = {
   student: document.getElementById('lesson-student'),
   studentList: document.getElementById('student-names'),
   durations: document.getElementById('lesson-durations'),
+  statuses: document.getElementById('lesson-statuses'),
   types: document.getElementById('lesson-types'),
   memo: document.getElementById('lesson-memo'),
   error: document.getElementById('lesson-error'),
@@ -42,6 +43,12 @@ for (let m = START_HOUR * 60; m < DAY_END; m += 15) {
 for (const min of store.DURATIONS) {
   f.durations.insertAdjacentHTML('beforeend',
     `<label class="chip"><input type="radio" name="duration" value="${min}"><span>${min}分</span></label>`);
+}
+
+// 仮・確約・キャンセルのボタンを並べる
+for (const st of store.STATUSES) {
+  f.statuses.insertAdjacentHTML('beforeend',
+    `<label class="chip status-chip status-${st.id}"><input type="radio" name="status" value="${st.id}"><span>${st.label}</span></label>`);
 }
 
 // 種類(色つき)のボタンを並べる
@@ -66,7 +73,7 @@ function check(name, value) {
 // 新しく入れる(date:"2026-10-05", time:"13:00")
 export async function openNewLesson(date, time) {
   const last = store.getLastInput();
-  await openLesson({ date, start: time, duration: last.duration, student: '', typeId: last.typeId, memo: '' });
+  await openLesson({ date, start: time, duration: last.duration, student: '', typeId: last.typeId, status: last.status, memo: '' });
 }
 
 // 入っている予定を開く
@@ -86,6 +93,7 @@ async function openLesson(lesson) {
   form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
   check('duration', lesson.duration);
   check('typeId', lesson.typeId);
+  check('status', lesson.status || 'tentative');
   if (!form.querySelector('input[name="typeId"]:checked')) form.querySelector('input[name="typeId"]').checked = true;
   f.error.textContent = '';
   f.del.hidden = !lesson.id;
@@ -98,6 +106,7 @@ form.addEventListener('submit', async e => {
   e.preventDefault();
   const duration = Number(form.querySelector('input[name="duration"]:checked')?.value);
   const typeId = form.querySelector('input[name="typeId"]:checked')?.value;
+  const status = form.querySelector('input[name="status"]:checked')?.value || 'tentative';
   const start = f.start.value;
   const date = f.date.value;
   if (!date) { f.error.textContent = '日付を選んでください'; return; }
@@ -110,10 +119,11 @@ form.addEventListener('submit', async e => {
     start,
     duration,
     typeId,
+    status,
     student: f.student.value.trim(),
     memo: f.memo.value.trim(),
   });
-  store.setLastInput(typeId, duration);
+  store.setLastInput({ typeId, duration, status });
   dialog.close();
   onChanged();
 });

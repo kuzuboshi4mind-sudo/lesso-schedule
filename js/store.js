@@ -22,6 +22,13 @@ const DEFAULT_TYPES = [
   { id: 'other',    name: 'その他',   color: '#9e9e9e', countInTotal: false },
 ];
 
+// 予定の状態。仮=まだ確定していない、確約=確定(◯)、キャンセル(×)
+export const STATUSES = [
+  { id: 'tentative', label: '仮' },
+  { id: 'confirmed', label: '確約 ○' },
+  { id: 'cancelled', label: 'キャンセル ×' },
+];
+
 // レッスンの長さの選択肢(分)。手順4で換算表と合わせて設定できるようにする
 export const DURATIONS = [15, 20, 30, 45, 60, 90];
 
@@ -53,7 +60,8 @@ export async function getTypes() {
 }
 
 // ---- レッスン ----
-// 1件の形:{ id, date:'2026-10-05', start:'13:15', duration:30, student:'山田', typeId:'home', memo:'' }
+// 1件の形:{ id, date:'2026-10-05', start:'13:15', duration:30, student:'山田', typeId:'home', status:'confirmed', memo:'' }
+// status がないもの(手順2で入れた予定)は「仮」として扱う
 
 // その月のレッスンをすべて返す(month は 1〜12)
 export async function getLessons(year, month) {
@@ -104,11 +112,11 @@ export async function saveDayNote(date, text) {
   save(KEYS.dayNotes, all);
 }
 
-// ---- 前回の入力(新しく入れるとき、種類と長さを前回と同じにする)----
+// ---- 前回の入力(新しく入れるとき、種類・長さ・状態を前回と同じにする)----
 export function getLastInput() {
-  return load(KEYS.lastInput, { typeId: DEFAULT_TYPES[0].id, duration: 30 });
+  return { typeId: DEFAULT_TYPES[0].id, duration: 30, status: 'tentative', ...load(KEYS.lastInput, {}) };
 }
 
-export function setLastInput(typeId, duration) {
-  try { localStorage.setItem(KEYS.lastInput, JSON.stringify({ typeId, duration })); } catch { /* 保存できなくても動作には影響しない */ }
+export function setLastInput({ typeId, duration, status }) {
+  try { localStorage.setItem(KEYS.lastInput, JSON.stringify({ typeId, duration, status })); } catch { /* 保存できなくても動作には影響しない */ }
 }

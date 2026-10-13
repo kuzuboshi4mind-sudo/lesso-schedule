@@ -102,18 +102,28 @@ function layoutLanes(lessons) {
   return result;
 }
 
+const STATUS_LABEL = { tentative: '仮', confirmed: '確約', cancelled: 'キャンセル' };
+
 // レッスン1件のブロック(マスの中に重ねて表示する色付きの帯)
+// 確約=濃い色+◯、仮=薄い色、キャンセル=灰色+×
 function lessonBlock(lesson, type, pos) {
   const offset = toMinutes(lesson.start) % 30;      // マスの上端から何分ずれているか
   const color = type ? type.color : '#9e9e9e';
+  const status = lesson.status || 'tentative';
   const width = 100 / pos.lanes;
   const memoMark = lesson.memo ? '<span class="lesson-memo-mark">✎</span>' : '';
   const durationLabel = lesson.duration !== 30 ? `<span class="lesson-dur">${lesson.duration}分</span>` : '';
-  const tip = `${lesson.start}〜 ${lesson.duration}分 ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
-  return `<button type="button" class="lesson${lesson.duration <= 20 ? ' short' : ''}" data-id="${escapeHtml(lesson.id)}"
+  const name = escapeHtml(lesson.student || '(名前なし)');
+  const label = status === 'confirmed' ? `${name}<span class="lesson-mark">○</span>`
+    : status === 'cancelled' ? `<span class="lesson-mark">×</span>${name}`
+    : name;
+  const tip = `${STATUS_LABEL[status]} ${lesson.start}〜 ${lesson.duration}分 ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
+  // 文字色は確約(濃い色の上)だけ背景に合わせて決める。仮・キャンセルは CSS で決める
+  const textColor = status === 'confirmed' ? `color:${textColorFor(color)};` : '';
+  return `<button type="button" class="lesson ${status}${lesson.duration <= 20 ? ' short' : ''}" data-id="${escapeHtml(lesson.id)}"
     title="${escapeHtml(tip)}"
-    style="--offset:${offset};--dur:${lesson.duration};left:${pos.lane * width}%;width:${width}%;background:${color};color:${textColorFor(color)}">
-    <span class="lesson-name">${escapeHtml(lesson.student || '(名前なし)')}</span>${durationLabel}${memoMark}
+    style="--offset:${offset};--dur:${lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
+    <span class="lesson-name">${label}</span>${durationLabel}${memoMark}
   </button>`;
 }
 
