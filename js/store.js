@@ -8,6 +8,7 @@ const KEYS = {
   dayNotes: 'lesso.dayNotes',
   types: 'lesso.types',
   lastInput: 'lesso.lastInput',
+  durationRules: 'lesso.durationRules',
 };
 
 // 種類(場所)の初期値。手順4の設定画面で追加・変更できるようにする
@@ -34,9 +35,18 @@ export const STATUSES = [
   { id: 'none', label: 'なし(自分の予定)' },
 ];
 
-// レッスンの長さの選択肢(分)。手順4で換算表と合わせて設定できるようにする
-// これより長い予定は、入力画面の「終了時刻で指定」を使う
-export const DURATIONS = [15, 20, 30, 45, 60, 90, 120];
+// 換算表の初期値:レッスンの長さ(分)→ 集計での時間数(h)
+// この表にある長さが、入力画面の「長さ」の選択肢になる(設定画面で変更できる)
+// 表にない長さ(「終了時刻で指定」の長い予定など)は、分÷60 で数える
+const DEFAULT_DURATION_RULES = [
+  { minutes: 15, hours: 0.25 },
+  { minutes: 20, hours: 0.5 },
+  { minutes: 30, hours: 0.5 },
+  { minutes: 45, hours: 0.75 },
+  { minutes: 60, hours: 1.0 },
+  { minutes: 90, hours: 1.5 },
+  { minutes: 120, hours: 2.0 },
+];
 
 function load(key, fallback) {
   try {
@@ -63,6 +73,34 @@ function newId() {
 // ---- 種類 ----
 export async function getTypes() {
   return load(KEYS.types, DEFAULT_TYPES);
+}
+
+// 種類の一覧をまるごと保存する(設定画面から)
+export async function saveTypes(types) {
+  save(KEYS.types, types);
+}
+
+export function newTypeId() {
+  return `type-${newId()}`;
+}
+
+// その種類の予定が何件あるか(削除するときの確認に使う)
+export async function countLessonsOfType(typeId) {
+  return load(KEYS.lessons, []).filter(l => l.typeId === typeId).length;
+}
+
+// ---- 換算表 ----
+export async function getDurationRules() {
+  return load(KEYS.durationRules, DEFAULT_DURATION_RULES);
+}
+
+export async function saveDurationRules(rules) {
+  save(KEYS.durationRules, [...rules].sort((a, b) => a.minutes - b.minutes));
+}
+
+// 入力画面の「長さ」の選択肢(分の一覧)
+export async function getDurations() {
+  return (await getDurationRules()).map(r => r.minutes);
 }
 
 // ---- レッスン ----

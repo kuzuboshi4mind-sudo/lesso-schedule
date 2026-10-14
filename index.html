@@ -16,6 +16,7 @@
       <button type="button" id="prev-month" class="btn" aria-label="前の月">◀ 前月</button>
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
       <button type="button" id="next-month" class="btn" aria-label="次の月">次月 ▶</button>
+      <button type="button" id="open-settings" class="btn" aria-label="設定">⚙ 設定</button>
     </nav>
     <div class="legends">
       <!-- 種類と色の見本 -->
@@ -128,6 +129,31 @@
         <button type="button" id="lesson-delete" class="btn btn-danger">この予定を削除</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- 設定画面:種類と色、換算表 -->
+  <dialog id="settings-dialog" class="sheet sheet-large">
+    <div class="sheet-head">
+      <h2 tabindex="-1">設定</h2>
+      <button type="button" class="btn btn-primary" data-close>閉じる</button>
+    </div>
+    <p class="sheet-note">変えた内容はすぐに保存され、表にも反映されます。</p>
+
+    <section class="settings-section">
+      <h3>種類と色</h3>
+      <p class="sheet-note">色の丸をタップすると色を選べます。上から順に、入力画面と色の見本に並びます。</p>
+      <ul id="type-list" class="type-list"></ul>
+      <button type="button" id="add-type" class="btn">+ 種類を追加</button>
+    </section>
+
+    <section class="settings-section">
+      <h3>換算表(長さ → 集計の時間数)</h3>
+      <p class="sheet-note">ここにある長さが、入力画面の「長さ」の選択肢になります。表にない長さ(「終了時刻で指定」の予定など)は、分÷60 で数えます。</p>
+      <table class="rule-table">
+        <tbody id="rule-list"></tbody>
+      </table>
+      <button type="button" id="add-rule" class="btn">+ 長さを追加</button>
+    </section>
   </dialog>
 
   <!-- 日ごとのメモ(「予定」の行)の入力画面 -->

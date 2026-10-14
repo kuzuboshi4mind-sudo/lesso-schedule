@@ -3,6 +3,7 @@ import { renderCalendar, escapeHtml } from './calendar.js';
 import * as store from './store.js';
 import { openNewLesson, openExistingLesson, openDayNote, setOnChanged } from './editor.js';
 import { initSelection, afterRender, handleTap, clearSelection } from './selection.js';
+import { initSettings } from './settings.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -96,5 +97,6 @@ table.addEventListener('click', e => {
 // 保存・削除したら、スクロール位置はそのままで表を描き直す
 setOnChanged(() => show({ keepScroll: true }));
 initSelection({ table, scroller, onChanged: () => show({ keepScroll: true }) });
+initSettings({ onChanged: () => show({ keepScroll: true }) });
 
 show();

@@ -43,13 +43,15 @@ for (let m = START_HOUR * 60; m < DAY_END; m += 15) {
   f.start.add(new Option(fromMinutes(m), fromMinutes(m)));
 }
 
+let durations = [];   // 長さの選択肢(設定画面の換算表から)
+
 // 長さのボタンを並べる。最後に「終了時刻で指定」(長い予定用)
-for (const min of store.DURATIONS) {
-  f.durations.insertAdjacentHTML('beforeend',
-    `<label class="chip"><input type="radio" name="duration" value="${min}"><span>${min}分</span></label>`);
+async function renderDurationChips() {
+  durations = await store.getDurations();
+  f.durations.innerHTML = durations.map(min =>
+    `<label class="chip"><input type="radio" name="duration" value="${min}"><span>${min}分</span></label>`).join('')
+    + `<label class="chip"><input type="radio" name="duration" value="end"><span>終了時刻で指定</span></label>`;
 }
-f.durations.insertAdjacentHTML('beforeend',
-  `<label class="chip"><input type="radio" name="duration" value="end"><span>終了時刻で指定</span></label>`);
 
 // 終了時刻の選択肢を、開始時刻の15分後〜24:00 で作り直す
 function renderEndOptions(keepEnd) {
@@ -135,7 +137,7 @@ export async function openExistingLesson(id) {
 
 async function openLesson(lesson) {
   editing = lesson;
-  await Promise.all([renderTypeChips(), loadStudentNames()]);
+  await Promise.all([renderTypeChips(), renderDurationChips(), loadStudentNames()]);
   f.title.textContent = lesson.id ? '予定を編集' : '予定を追加';
   f.date.value = lesson.date;
   f.start.value = lesson.start;
@@ -143,7 +145,7 @@ async function openLesson(lesson) {
   f.memo.value = lesson.memo || '';
   form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
   // 長さが選択肢にないとき(長い予定など)は「終了時刻で指定」にする
-  if (store.DURATIONS.includes(lesson.duration)) check('duration', lesson.duration);
+  if (durations.includes(lesson.duration)) check('duration', lesson.duration);
   else check('duration', 'end');
   renderEndOptions(toMinutes(lesson.start) + lesson.duration);
   syncEndField();
@@ -182,7 +184,7 @@ form.addEventListener('submit', async e => {
     memo: f.memo.value.trim(),
   });
   // 次に入れるときの初期値(長い予定は30分に戻す)
-  store.setLastInput({ typeId, duration: store.DURATIONS.includes(duration) ? duration : 30, status });
+  store.setLastInput({ typeId, duration: durations.includes(duration) ? duration : 30, status });
   dialog.close();
   onChanged();
 });
