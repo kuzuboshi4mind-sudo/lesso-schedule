@@ -731,3 +731,38 @@ body.has-selection .calendar-scroll { padding-bottom: 130px; }
 /* 長押しのあと指でなぞっている間は、表がスクロールしないように止める */
 .calendar-scroll.drag-lock { overflow: hidden; }
 .toggle-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }
+
+/* =========================================================
+   ログイン画面
+   ========================================================= */
+body.locked > :not(#login-screen) { display: none !important; }
+.login-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px 16px;
+}
+.login-screen[hidden] { display: none; }
+.login-card {
+  width: min(380px, 100%);
+  padding: 28px 24px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+.login-card .field { text-align: left; }
+.login-card h1 { margin: 12px 0 20px; font-size: 1.3rem; color: var(--accent); }
+.login-icon { border-radius: 20px; }
+.login-card input {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.login-submit { width: 100%; min-height: 50px; font-size: 1.05rem; }

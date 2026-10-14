@@ -5,6 +5,7 @@ import { openNewLesson, openExistingLesson, openDayNote, setOnChanged } from './
 import { initSelection, afterRender, handleTap, clearSelection } from './selection.js';
 import { initSettings } from './settings.js';
 import { initZoom, refreshZoom } from './zoom.js';
+import { requireLogin, watchLogout, logout } from './login.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -102,4 +103,25 @@ initSelection({ table, scroller, onChanged: () => show({ keepScroll: true }) });
 initSettings({ onChanged: () => show({ keepScroll: true }) });
 initZoom({ table, scroller });
 
-show();
+// 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)
+window.addEventListener('unhandledrejection', e => {
+  alert(e.reason?.message || '保存できませんでした。もう一度試してください。');
+});
+
+// 起動:クラウド保存ならログインを待ってから表を出す
+async function start() {
+  const user = await requireLogin();
+  const info = document.getElementById('account-info');
+  if (user) {
+    info.textContent = `クラウドに保存しています(${user.email} でログイン中)。どの端末からも同じデータが見られます。`;
+    const btn = document.getElementById('logout');
+    btn.hidden = false;
+    btn.addEventListener('click', logout);
+    watchLogout();
+  } else {
+    info.textContent = 'この端末の中に保存しています(クラウドは未設定)。ほかの端末とは共有されません。';
+  }
+  show();
+}
+
+start();

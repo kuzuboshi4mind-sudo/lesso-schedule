@@ -18,6 +18,24 @@
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
+  <!-- ログイン画面(クラウド保存のとき、ログインするまでこれだけを見せる) -->
+  <div id="login-screen" class="login-screen" hidden>
+    <form id="login-form" class="login-card">
+      <img src="icons/icon.svg" alt="" class="login-icon" width="88" height="88">
+      <h1>レッスンスケジュール</h1>
+      <label class="field">
+        <span class="field-label">メールアドレス</span>
+        <input type="email" id="login-email" autocomplete="username" autocapitalize="off" required>
+      </label>
+      <label class="field">
+        <span class="field-label">パスワード</span>
+        <input type="password" id="login-password" autocomplete="current-password" required>
+      </label>
+      <p id="login-error" class="form-error" role="alert"></p>
+      <button type="submit" class="btn btn-primary login-submit">ログイン</button>
+    </form>
+  </div>
+
   <!-- 上の帯:月の表示と切り替えボタン -->
   <header class="app-header">
     <h1 id="month-title" class="month-title">----年--月</h1>
@@ -149,6 +167,12 @@
       <button type="button" class="btn btn-primary" data-close>閉じる</button>
     </div>
     <p class="sheet-note">変えた内容はすぐに保存され、表にも反映されます。</p>
+
+    <section class="settings-section">
+      <h3>保存先とアカウント</h3>
+      <p id="account-info" class="sheet-note"></p>
+      <button type="button" id="logout" class="btn" hidden>ログアウト</button>
+    </section>
 
     <section class="settings-section">
       <h3>種類と色</h3>
