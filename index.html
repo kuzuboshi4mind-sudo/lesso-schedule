@@ -25,6 +25,7 @@
         <li><span class="legend-lesson lesson confirmed">名前<span class="lesson-mark">○</span></span>確約</li>
         <li><span class="legend-lesson lesson tentative">名前</span>仮</li>
         <li><span class="legend-lesson lesson cancelled"><span class="lesson-mark">×</span><span class="lesson-name">名前</span></span>キャンセル</li>
+        <li><span class="legend-lesson lesson none">予定</span>なし</li>
       </ul>
     </div>
   </header>
@@ -33,6 +34,38 @@
   <main id="calendar-scroll" class="calendar-scroll">
     <table id="calendar" class="calendar"></table>
   </main>
+
+  <!-- マスを長押しで選んだときの操作バー -->
+  <div id="selection-bar" class="selection-bar" hidden>
+    <span id="selection-info" class="selection-info"></span>
+    <div class="selection-actions">
+      <button type="button" id="sel-text" class="btn">文字を入力</button>
+      <button type="button" id="sel-copy" class="btn">コピー</button>
+      <button type="button" id="sel-paste" class="btn">貼り付け</button>
+      <button type="button" id="sel-delete" class="btn btn-danger">削除</button>
+      <button type="button" id="sel-done" class="btn btn-primary">完了</button>
+    </div>
+  </div>
+
+  <!-- 短いお知らせ(「3件コピーしました」など) -->
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <!-- 選んだマスに文字を直接入れる画面 -->
+  <dialog id="text-dialog" class="sheet sheet-small">
+    <form id="text-form" method="dialog">
+      <h2>文字を入力</h2>
+      <p id="text-target" class="sheet-note"></p>
+      <label class="field">
+        <span class="field-label">名前・内容</span>
+        <input type="text" id="text-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <div class="sheet-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>やめる</button>
+        <button type="submit" class="btn btn-primary">入れる</button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- 予定(レッスン)の入力画面 -->
   <dialog id="lesson-dialog" class="sheet">
@@ -50,11 +83,12 @@
         </label>
       </div>
 
-      <label class="field">
-        <span class="field-label">生徒名</span>
-        <input type="text" id="lesson-student" list="student-names" autocomplete="off" placeholder="例:山田">
-        <datalist id="student-names"></datalist>
-      </label>
+      <div class="field">
+        <label class="field-label" for="lesson-student">名前・内容</label>
+        <input type="text" id="lesson-student" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="例:山田 / 練習">
+        <!-- 前に入れた名前の候補(タップで入る) -->
+        <div id="student-suggest" class="suggest" hidden></div>
+      </div>
 
       <fieldset class="field">
         <legend class="field-label">状態</legend>
@@ -64,6 +98,12 @@
       <fieldset class="field">
         <legend class="field-label">長さ</legend>
         <div id="lesson-durations" class="chips"></div>
+        <!-- 「終了時刻で指定」を選んだときだけ出る -->
+        <label id="lesson-end-field" class="end-field" hidden>
+          <span>終了</span>
+          <select id="lesson-end"></select>
+          <span id="lesson-end-length" class="end-length"></span>
+        </label>
       </fieldset>
 
       <fieldset class="field">

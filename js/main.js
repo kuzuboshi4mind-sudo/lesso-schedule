@@ -2,6 +2,7 @@
 import { renderCalendar, escapeHtml } from './calendar.js';
 import * as store from './store.js';
 import { openNewLesson, openExistingLesson, openDayNote, setOnChanged } from './editor.js';
+import { initSelection, afterRender, handleTap, clearSelection } from './selection.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -40,6 +41,7 @@ async function show({ keepScroll = false } = {}) {
   const { scrollLeft, scrollTop } = scroller;
   renderCalendar(table, year, month, { lessons, dayNotes, types });
   renderLegend(types);
+  afterRender(lessons);
   if (keepScroll) {
     scroller.scrollLeft = scrollLeft;
     scroller.scrollTop = scrollTop;
@@ -65,6 +67,7 @@ function scrollToToday() {
 }
 
 function moveMonth(diff) {
+  clearSelection();
   const d = new Date(current.year, current.month - 1 + diff, 1);
   current = { year: d.getFullYear(), month: d.getMonth() + 1 };
   show();
@@ -73,12 +76,15 @@ function moveMonth(diff) {
 document.getElementById('prev-month').addEventListener('click', () => moveMonth(-1));
 document.getElementById('next-month').addEventListener('click', () => moveMonth(1));
 document.getElementById('this-month').addEventListener('click', () => {
+  clearSelection();
   current = thisMonth();
   show();
 });
 
 // 表のタップ:予定のブロック → 編集、空いたマス → 新規、「予定」の行 → 日ごとのメモ
+// (長押しで選択中のときは、タップは選択の操作になる)
 table.addEventListener('click', e => {
+  if (handleTap(e)) return;
   const lesson = e.target.closest('.lesson');
   if (lesson) return openExistingLesson(lesson.dataset.id);
   const memo = e.target.closest('th.day-memo');
@@ -89,5 +95,6 @@ table.addEventListener('click', e => {
 
 // 保存・削除したら、スクロール位置はそのままで表を描き直す
 setOnChanged(() => show({ keepScroll: true }));
+initSelection({ table, scroller, onChanged: () => show({ keepScroll: true }) });
 
 show();

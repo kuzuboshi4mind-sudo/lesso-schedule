@@ -22,8 +22,11 @@ const f = {
   date: document.getElementById('lesson-date'),
   start: document.getElementById('lesson-start'),
   student: document.getElementById('lesson-student'),
-  studentList: document.getElementById('student-names'),
+  suggest: document.getElementById('student-suggest'),
   durations: document.getElementById('lesson-durations'),
+  endField: document.getElementById('lesson-end-field'),
+  end: document.getElementById('lesson-end'),
+  endLength: document.getElementById('lesson-end-length'),
   statuses: document.getElementById('lesson-statuses'),
   types: document.getElementById('lesson-types'),
   memo: document.getElementById('lesson-memo'),
@@ -33,17 +36,46 @@ const f = {
 
 let editing = null;   // 編集中のレッスン(新規なら id なし)
 let onChanged = () => {};
+let studentNames = []; // 前に入れた名前(候補用)
 
 // 6:00〜23:45 を15分刻みで選べるようにする
 for (let m = START_HOUR * 60; m < DAY_END; m += 15) {
   f.start.add(new Option(fromMinutes(m), fromMinutes(m)));
 }
 
-// 長さのボタンを並べる
+// 長さのボタンを並べる。最後に「終了時刻で指定」(長い予定用)
 for (const min of store.DURATIONS) {
   f.durations.insertAdjacentHTML('beforeend',
     `<label class="chip"><input type="radio" name="duration" value="${min}"><span>${min}分</span></label>`);
 }
+f.durations.insertAdjacentHTML('beforeend',
+  `<label class="chip"><input type="radio" name="duration" value="end"><span>終了時刻で指定</span></label>`);
+
+// 終了時刻の選択肢を、開始時刻の15分後〜24:00 で作り直す
+function renderEndOptions(keepEnd) {
+  const start = toMinutes(f.start.value);
+  f.end.innerHTML = '';
+  for (let m = start + 15; m <= DAY_END; m += 15) f.end.add(new Option(fromMinutes(m), m));
+  const want = keepEnd && keepEnd > start ? Math.min(keepEnd, DAY_END) : Math.min(start + 150, DAY_END);
+  f.end.value = String(want);
+  updateEndLength();
+}
+
+function updateEndLength() {
+  const min = Number(f.end.value) - toMinutes(f.start.value);
+  f.endLength.textContent = min > 0 ? `(${Math.floor(min / 60) ? Math.floor(min / 60) + '時間' : ''}${min % 60 ? (min % 60) + '分' : ''})` : '';
+}
+
+function syncEndField() {
+  f.endField.hidden = form.querySelector('input[name="duration"]:checked')?.value !== 'end';
+}
+
+f.durations.addEventListener('change', () => {
+  syncEndField();
+  if (!f.endField.hidden) renderEndOptions(Number(f.end.value));
+});
+f.start.addEventListener('change', () => renderEndOptions(Number(f.end.value)));
+f.end.addEventListener('change', updateEndLength);
 
 // 仮・確約・キャンセルのボタンを並べる
 for (const st of store.STATUSES) {
@@ -60,10 +92,29 @@ async function renderTypeChips() {
     </label>`).join('');
 }
 
-async function renderStudentNames() {
-  const names = await store.getStudentNames();
-  f.studentList.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+// 名前の候補。ブラウザの候補表示(datalist)は iPad で入力のじゃまになるため、自前で出す
+async function loadStudentNames() {
+  studentNames = await store.getStudentNames();
 }
+
+function renderSuggest() {
+  const text = f.student.value.trim();
+  const hits = studentNames.filter(n => n !== text && (!text || n.includes(text))).slice(0, 8);
+  f.suggest.innerHTML = hits.map(n => `<button type="button" class="suggest-item">${escapeHtml(n)}</button>`).join('');
+  f.suggest.hidden = hits.length === 0 || document.activeElement !== f.student;
+}
+
+f.student.addEventListener('input', renderSuggest);
+f.student.addEventListener('focus', renderSuggest);
+f.student.addEventListener('blur', () => setTimeout(() => { f.suggest.hidden = true; }, 200));
+// 候補をタップしたら名前の欄に入れる(押した瞬間に入力欄から離れないよう pointerdown で止める)
+f.suggest.addEventListener('pointerdown', e => e.preventDefault());
+f.suggest.addEventListener('click', e => {
+  const item = e.target.closest('.suggest-item');
+  if (!item) return;
+  f.student.value = item.textContent;
+  f.suggest.hidden = true;
+});
 
 function check(name, value) {
   const input = form.querySelector(`input[name="${name}"][value="${CSS.escape(String(value))}"]`);
@@ -84,14 +135,19 @@ export async function openExistingLesson(id) {
 
 async function openLesson(lesson) {
   editing = lesson;
-  await Promise.all([renderTypeChips(), renderStudentNames()]);
+  await Promise.all([renderTypeChips(), loadStudentNames()]);
   f.title.textContent = lesson.id ? '予定を編集' : '予定を追加';
   f.date.value = lesson.date;
   f.start.value = lesson.start;
   f.student.value = lesson.student;
   f.memo.value = lesson.memo || '';
   form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
-  check('duration', lesson.duration);
+  // 長さが選択肢にないとき(長い予定など)は「終了時刻で指定」にする
+  if (store.DURATIONS.includes(lesson.duration)) check('duration', lesson.duration);
+  else check('duration', 'end');
+  renderEndOptions(toMinutes(lesson.start) + lesson.duration);
+  syncEndField();
+  f.suggest.hidden = true;
   check('typeId', lesson.typeId);
   check('status', lesson.status || 'tentative');
   if (!form.querySelector('input[name="typeId"]:checked')) form.querySelector('input[name="typeId"]').checked = true;
@@ -104,13 +160,14 @@ async function openLesson(lesson) {
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
-  const duration = Number(form.querySelector('input[name="duration"]:checked')?.value);
+  const picked = form.querySelector('input[name="duration"]:checked')?.value;
+  const duration = picked === 'end' ? Number(f.end.value) - toMinutes(f.start.value) : Number(picked);
   const typeId = form.querySelector('input[name="typeId"]:checked')?.value;
   const status = form.querySelector('input[name="status"]:checked')?.value || 'tentative';
   const start = f.start.value;
   const date = f.date.value;
   if (!date) { f.error.textContent = '日付を選んでください'; return; }
-  if (!duration) { f.error.textContent = '長さを選んでください'; return; }
+  if (!(duration > 0)) { f.error.textContent = picked === 'end' ? '終了時刻を開始より後にしてください' : '長さを選んでください'; return; }
   if (toMinutes(start) + duration > DAY_END) { f.error.textContent = '24:00 を過ぎてしまいます。開始時刻か長さを変えてください'; return; }
 
   await store.saveLesson({
@@ -123,7 +180,8 @@ form.addEventListener('submit', async e => {
     student: f.student.value.trim(),
     memo: f.memo.value.trim(),
   });
-  store.setLastInput({ typeId, duration, status });
+  // 次に入れるときの初期値(長い予定は30分に戻す)
+  store.setLastInput({ typeId, duration: store.DURATIONS.includes(duration) ? duration : 30, status });
   dialog.close();
   onChanged();
 });

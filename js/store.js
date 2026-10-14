@@ -19,18 +19,24 @@ const DEFAULT_TYPES = [
   { id: 'sunpal',   name: 'サンパル', color: '#56ccf2', countInTotal: true },
   { id: 'visit',    name: '訪問',     color: '#9b51e0', countInTotal: true },
   { id: 'online',   name: 'オンライン', color: '#2f5fd0', countInTotal: true },
+  { id: 'jinis',    name: 'JINIS',    color: '#f48fb1', countInTotal: true },
+  { id: 'sauna',    name: 'サウナ',   color: '#a1887f', countInTotal: false },
+  { id: 'practice', name: '練習',     color: '#26a69a', countInTotal: false },
   { id: 'other',    name: 'その他',   color: '#9e9e9e', countInTotal: false },
 ];
 
-// 予定の状態。仮=まだ確定していない、確約=確定(◯)、キャンセル(×)
+// 予定の状態。仮=まだ確定していない、確約=確定(○)、キャンセル(×)、
+// なし=レッスン以外の自分の予定(仮・確約の区別がないもの)
 export const STATUSES = [
   { id: 'tentative', label: '仮' },
   { id: 'confirmed', label: '確約 ○' },
   { id: 'cancelled', label: 'キャンセル ×' },
+  { id: 'none', label: 'なし(自分の予定)' },
 ];
 
 // レッスンの長さの選択肢(分)。手順4で換算表と合わせて設定できるようにする
-export const DURATIONS = [15, 20, 30, 45, 60, 90];
+// これより長い予定は、入力画面の「終了時刻で指定」を使う
+export const DURATIONS = [15, 20, 30, 45, 60, 90, 120];
 
 function load(key, fallback) {
   try {
@@ -71,6 +77,20 @@ export async function getLessons(year, month) {
 
 export async function getLesson(id) {
   return load(KEYS.lessons, []).find(l => l.id === id) || null;
+}
+
+// まとめて追加する(貼り付け・文字の直接入力で使う)
+export async function addLessons(lessons) {
+  const all = load(KEYS.lessons, []);
+  const added = lessons.map(l => ({ ...l, id: newId() }));
+  save(KEYS.lessons, all.concat(added));
+  return added;
+}
+
+// まとめて削除する
+export async function deleteLessons(ids) {
+  const set = new Set(ids);
+  save(KEYS.lessons, load(KEYS.lessons, []).filter(l => !set.has(l.id)));
 }
 
 // 新規(id なし)なら追加、id ありなら上書き
