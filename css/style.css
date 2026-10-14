@@ -20,13 +20,16 @@
   --sat: #2f6fd0;           /* 土曜の文字 */
   --danger: #c0392b;        /* 削除ボタン */
 
-  /* 大きさ */
-  --time-col: 56px;         /* 時刻の列の幅 */
-  --day-col: 58px;          /* 日付の列の幅 */
-  --row: 34px;              /* 30分の行の高さ */
-  --h-date: 34px;           /* 日付の行の高さ */
-  --h-week: 26px;           /* 曜日の行の高さ */
-  --h-memo: 40px;           /* メモの行の高さ */
+  /* 大きさ。--zx(横)・--zy(縦)・--zf(文字)は表の拡大率で、ピンチ操作に合わせて js/zoom.js が変える */
+  --zx: 1;
+  --zy: 1;
+  --zf: 1;
+  --time-col: calc(56px * max(var(--zf), 0.8));  /* 時刻の列の幅 */
+  --day-col: calc(58px * var(--zx));             /* 日付の列の幅 */
+  --row: calc(34px * var(--zy));                 /* 30分の行の高さ */
+  --h-date: calc(34px * var(--zf));              /* 日付の行の高さ */
+  --h-week: calc(26px * var(--zf));              /* 曜日の行の高さ */
+  --h-memo: calc(40px * var(--zf));              /* メモの行の高さ */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -134,7 +137,7 @@ body {
   border-collapse: separate;   /* 見出しの固定をきれいにするため */
   border-spacing: 0;
   table-layout: fixed;
-  font-size: 12px;
+  font-size: calc(12px * var(--zf));
   background: var(--surface);
 }
 
@@ -160,7 +163,7 @@ body {
   z-index: 2;
   background: var(--head);
 }
-.calendar .row-date th { top: 0; height: var(--h-date); font-size: 15px; font-weight: 700; }
+.calendar .row-date th { top: 0; height: var(--h-date); font-size: 1.25em; font-weight: 700; }
 .calendar .row-week th { top: var(--h-date); height: var(--h-week); font-weight: 600; }
 .calendar .row-memo th {
   top: calc(var(--h-date) + var(--h-week));
@@ -200,7 +203,7 @@ body {
 
 .holiday-name {
   display: block;
-  font-size: 10px;
+  font-size: 0.83em;
 }
 
 /* ---- 土日・祝日の列(水色) ---- */
@@ -221,7 +224,7 @@ body {
 .day-note {
   display: block;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 0.92em;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -247,7 +250,7 @@ body {
   border-radius: 5px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
   font: inherit;
-  font-size: 12px;
+  font-size: 1em;
   line-height: 1.15;
   text-align: center;
   display: flex;
@@ -272,16 +275,16 @@ body {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.lesson-dur { font-size: 10px; opacity: 0.85; }
+.lesson-dur { font-size: 0.83em; opacity: 0.85; }
 .lesson-memo-mark {
   position: absolute;
   top: 0;
   right: 2px;
-  font-size: 9px;
+  font-size: 0.75em;
 }
 /* 短いレッスン(15分・20分)は名前だけ */
 .lesson.short .lesson-dur { display: none; }
-.lesson.short { font-size: 11px; padding-top: 0; padding-bottom: 0; }
+.lesson.short { font-size: 0.92em; padding-top: 0; padding-bottom: 0; }
 
 /* =========================================================
    予定の状態:確約=濃い色+◯、仮=薄い色+点線、キャンセル=灰色+×
@@ -362,7 +365,7 @@ body {
   flex-direction: row;
   height: 20px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: 11px !important;
   font-weight: 700;
   pointer-events: none;
 }
@@ -722,3 +725,9 @@ body.has-selection .calendar-scroll { padding-bottom: 130px; }
   font-size: 16px;
   text-align: right;
 }
+
+/* 表の大きさボタン(1か月を1画面に / 元の大きさ) */
+.zoom-btn[aria-pressed="true"] { background: var(--head); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+/* ピンチで拡大・縮小している最中は、表の中の文字選択などを出さない */
+.calendar-scroll { touch-action: pan-x pan-y; }
+.toggle-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }

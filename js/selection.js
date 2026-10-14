@@ -1,6 +1,8 @@
 // マスの選択(Numbers のような操作)
 // ・長押し → そのマスを選択。指を離さずになぞると範囲を選択できる
-// ・選択中にタップ → そのマスだけを選択し直す(Mac は Shift+クリックで範囲を広げる)
+// ・選択中にタップ → そのマスだけを選択し直す
+// ・⇧(Shift)を押しながら長押し・タップ・クリック → 離れたマスを追加で選ぶ(複数選択)。
+//   もう一度 ⇧+タップすると、そのマスの選択を外す。キーボードがないときは操作バーの「⇧ 追加選択」を使う
 // ・下に出る操作バーで「文字を入力」「コピー」「貼り付け」「削除」
 // ・「戻す」「やり直す」で、直前の操作を取り消す/もう一度行う
 // ・Mac のキー操作(選択中):矢印で移動、Shift+矢印で範囲、⌘A 全部、⌘C コピー、⌘X 切り取り、⌘V 貼り付け、
@@ -18,8 +20,11 @@ const CLIP_KEY = 'lesso.clipboard';
 
 let table, scroller, onChanged;
 let lessons = [];            // 表示中の月の予定
-let anchor = null;           // 選択の起点 { date, idx }(idx は時刻の行番号)
-let focus = null;            // 選択の終点
+let anchor = null;           // いま選んでいる範囲の起点 { date, idx }(idx は時刻の行番号)
+let focus = null;            // いま選んでいる範囲の終点
+let others = [];             // 複数選択のとき、ほかに選んである範囲 [{ anchor, focus }, ...]
+let multiMode = false;       // 操作バーの「⇧ 追加選択」がオンのとき true
+let pressAdd = false;        // 長押しを始めたときに ⇧ が押されていたか
 let dragging = false;        // 長押しのあと、なぞって範囲を選んでいる最中
 let pressTimer = null;
 let pressStart = null;
@@ -31,6 +36,7 @@ const barInfo = document.getElementById('selection-info');
 const pasteBtn = document.getElementById('sel-paste');
 const undoBtn = document.getElementById('sel-undo');
 const redoBtn = document.getElementById('sel-redo');
+const multiBtn = document.getElementById('sel-multi');
 const toast = document.getElementById('toast');
 const textDialog = document.getElementById('text-dialog');
 const textForm = document.getElementById('text-form');
@@ -54,7 +60,7 @@ export function initSelection(opts) {
   table.addEventListener('contextmenu', e => {
     e.preventDefault();
     const cell = cellAt(e.clientX, e.clientY);
-    if (cell) startSelection(cell);
+    if (cell) startSelection(cell, e.shiftKey || e.metaKey || multiMode);
   });
 
   document.getElementById('sel-text').addEventListener('click', openTextInput);
@@ -64,6 +70,7 @@ export function initSelection(opts) {
   document.getElementById('sel-done').addEventListener('click', clearSelection);
   undoBtn.addEventListener('click', undo);
   redoBtn.addEventListener('click', redo);
+  multiBtn.addEventListener('click', () => { multiMode = !multiMode; paint(); });
   document.addEventListener('keydown', onKeyDown);
 
   textForm.addEventListener('submit', e => { e.preventDefault(); saveText(); });
@@ -88,7 +95,8 @@ export function handleTap(e) {
   if (!anchor) return false;
   const cell = cellAt(e.clientX, e.clientY);
   if (cell) {
-    if (e.shiftKey) focus = cell; else anchor = focus = cell;
+    if (e.shiftKey || e.metaKey || multiMode) toggleCell(cell);
+    else { others = []; anchor = focus = cell; }
     paint();
   }
   return true;
@@ -96,8 +104,28 @@ export function handleTap(e) {
 
 export function clearSelection() {
   anchor = focus = null;
+  others = [];
+  multiMode = false;
   dragging = false;
   paint();
+}
+
+function sameCell(a, b) {
+  return a.date === b.date && a.idx === b.idx;
+}
+
+// 複数選択:そのマスだけの選択がすでにあれば外す、なければ追加する
+function toggleCell(cell) {
+  const pieces = [...others, { anchor, focus }];
+  const i = pieces.findIndex(p => sameCell(p.anchor, cell) && sameCell(p.focus, cell));
+  if (i >= 0) {
+    pieces.splice(i, 1);
+    if (!pieces.length) { anchor = focus = null; others = []; return; }
+  } else {
+    pieces.push({ anchor: cell, focus: cell });
+  }
+  ({ anchor, focus } = pieces.pop());
+  others = pieces;
 }
 
 // ---------------------------------------------------------
@@ -107,7 +135,7 @@ function onTouchStart(e) {
   lastTouchAt = Date.now();
   if (e.touches.length !== 1) return cancelPress();
   const t = e.touches[0];
-  beginPress(t.clientX, t.clientY);
+  beginPress(t.clientX, t.clientY, e.shiftKey);
 }
 
 function onTouchMove(e) {
@@ -123,7 +151,7 @@ function onTouchMove(e) {
 
 function onMouseDown(e) {
   if (e.button !== 0 || Date.now() - lastTouchAt < 800) return;
-  beginPress(e.clientX, e.clientY);
+  beginPress(e.clientX, e.clientY, e.shiftKey || e.metaKey);
 }
 
 function onMouseMove(e) {
@@ -132,14 +160,15 @@ function onMouseMove(e) {
   else if (pressStart && moved(e.clientX, e.clientY)) cancelPress();
 }
 
-function beginPress(x, y) {
+function beginPress(x, y, add) {
   cancelPress();
   const cell = cellAt(x, y);
   if (!cell) return;
   pressStart = { x, y };
+  pressAdd = add || multiMode;
   pressTimer = setTimeout(() => {
     pressTimer = null;
-    startSelection(cell);
+    startSelection(cell, pressAdd);
     dragging = true;
   }, LONG_PRESS_MS);
 }
@@ -162,7 +191,10 @@ function moved(x, y) {
   return Math.hypot(x - pressStart.x, y - pressStart.y) > MOVE_TOLERANCE;
 }
 
-function startSelection(cell) {
+// add が true なら、いまの選択を残したまま新しい範囲を足す(複数選択)
+function startSelection(cell, add = false) {
+  if (add && anchor) others.push({ anchor, focus });
+  else others = [];
   anchor = focus = cell;
   if (navigator.vibrate) navigator.vibrate(10);
   paint();
@@ -204,19 +236,36 @@ function dateColumns() {
   return [...table.querySelectorAll('thead .row-date th[data-date]')].map(th => th.dataset.date);
 }
 
-// 選んでいる範囲 { dates:[日付...], i1, i2, top:開始の分, bottom:終わりの分 }
-function range() {
-  if (!anchor) return null;
-  const cols = dateColumns();
-  const c1 = cols.indexOf(anchor.date), c2 = cols.indexOf(focus.date);
+// 起点と終点から範囲を作る { dates:[日付...], i1, i2, top:開始の分, bottom:終わりの分 }
+function toRange(a, f, cols = dateColumns()) {
+  const c1 = cols.indexOf(a.date), c2 = cols.indexOf(f.date);
   if (c1 < 0 || c2 < 0) return null;
-  const i1 = Math.min(anchor.idx, focus.idx), i2 = Math.max(anchor.idx, focus.idx);
+  const i1 = Math.min(a.idx, f.idx), i2 = Math.max(a.idx, f.idx);
   return {
     dates: cols.slice(Math.min(c1, c2), Math.max(c1, c2) + 1),
+    c1: Math.min(c1, c2),
     i1, i2,
     top: toMinutes(SLOTS[i1]),
     bottom: toMinutes(SLOTS[i2]) + 30,
   };
+}
+
+// いま選んでいる範囲(複数選択のときは最後に選んだもの)
+function range() {
+  return anchor ? toRange(anchor, focus) : null;
+}
+
+// 選んでいるすべての範囲
+function ranges() {
+  if (!anchor) return [];
+  const cols = dateColumns();
+  return [...others, { anchor, focus }].map(p => toRange(p.anchor, p.focus, cols)).filter(Boolean);
+}
+
+// 1マスだけを選んでいるか
+function isSingleCell() {
+  const rs = ranges();
+  return rs.length === 1 && rs[0].dates.length === 1 && rs[0].i1 === rs[0].i2;
 }
 
 // 範囲の中で始まる予定
@@ -224,25 +273,41 @@ function lessonsInRange(r) {
   return lessons.filter(l => r.dates.includes(l.date) && toMinutes(l.start) >= r.top && toMinutes(l.start) < r.bottom);
 }
 
+// 選んでいるすべての範囲の中の予定(重なりは1件として数える)
+function lessonsInSelection() {
+  const seen = new Map();
+  for (const r of ranges()) for (const l of lessonsInRange(r)) seen.set(l.id, l);
+  return [...seen.values()];
+}
+
 function paint() {
   table.querySelectorAll('td.sel').forEach(td => td.classList.remove('sel'));
-  const r = range();
+  const rs = ranges();
+  const r = rs[rs.length - 1];
   table.classList.toggle('selecting', !!r);
   document.body.classList.toggle('has-selection', !!r);  // 操作バーの分、表の下に余白を作る
   if (!r) {
     bar.hidden = true;
     return;
   }
-  for (const date of r.dates) {
-    for (let i = r.i1; i <= r.i2; i++) {
-      table.querySelector(`td[data-date="${date}"][data-time="${SLOTS[i]}"]`)?.classList.add('sel');
+  for (const each of rs) {
+    for (const date of each.dates) {
+      for (let i = each.i1; i <= each.i2; i++) {
+        table.querySelector(`td[data-date="${date}"][data-time="${SLOTS[i]}"]`)?.classList.add('sel');
+      }
     }
   }
-  const first = shortDate(r.dates[0]);
-  const last = shortDate(r.dates[r.dates.length - 1]);
-  const days = r.dates.length > 1 ? `${first}〜${last}` : first;
-  const count = lessonsInRange(r).length;
-  barInfo.textContent = `${days} ${SLOTS[r.i1]}〜${fromMinutes(r.bottom)}${count ? `(予定${count}件)` : ''}`;
+  const count = lessonsInSelection().length;
+  const countText = count ? `(予定${count}件)` : '';
+  if (rs.length > 1) {
+    barInfo.textContent = `${rs.length}か所を選択${countText}`;
+  } else {
+    const first = shortDate(r.dates[0]);
+    const last = shortDate(r.dates[r.dates.length - 1]);
+    const days = r.dates.length > 1 ? `${first}〜${last}` : first;
+    barInfo.textContent = `${days} ${SLOTS[r.i1]}〜${fromMinutes(r.bottom)}${countText}`;
+  }
+  multiBtn.setAttribute('aria-pressed', String(multiMode));
   pasteBtn.disabled = !readClipboard();
   undoBtn.disabled = !store.canUndo();
   redoBtn.disabled = !store.canRedo();
@@ -258,33 +323,44 @@ function shortDate(date) {
 // 操作:文字を入力・コピー・貼り付け・削除
 // ---------------------------------------------------------
 // 文字を入力:選んだ範囲に予定を作る(1マスに予定が1件だけあるときは、その名前を書き換える)
+// 1マスに予定が1件だけのときは、その予定(名前の書き換え・編集の対象)
+function singleLesson() {
+  if (!isSingleCell()) return null;
+  const inside = lessonsInSelection();
+  return inside.length === 1 ? inside[0] : null;
+}
+
 function openTextInput() {
-  const r = range();
-  if (!r) return;
-  const inside = lessonsInRange(r);
-  const renaming = r.dates.length === 1 && r.i1 === r.i2 && inside.length === 1;
-  textInput.value = renaming ? inside[0].student : '';
-  textTarget.textContent = renaming
-    ? `「${inside[0].student || '(名前なし)'}」の名前を書き換えます`
-    : `${r.dates.length}日分 × ${SLOTS[r.i1]}〜${fromMinutes(r.bottom)} に予定を作ります(種類・状態は前回と同じ)`;
+  const rs = ranges();
+  if (!rs.length) return;
+  const target = singleLesson();
+  textInput.value = target ? target.student : '';
+  const r = rs[0];
+  const count = rs.reduce((n, each) => n + each.dates.length, 0);
+  textTarget.textContent = target
+    ? `「${target.student || '(名前なし)'}」の名前を書き換えます`
+    : rs.length > 1
+      ? `選んだ${rs.length}か所に、合わせて${count}件の予定を作ります(種類・状態は前回と同じ)`
+      : `${r.dates.length}日分 × ${SLOTS[r.i1]}〜${fromMinutes(r.bottom)} に予定を作ります(種類・状態は前回と同じ)`;
   textDialog.showModal();
   textInput.focus();
 }
 
 async function saveText() {
   const text = textInput.value.trim();
-  const r = range();
+  const rs = ranges();
   textDialog.close();
-  if (!text || !r) return;
-  const inside = lessonsInRange(r);
-  if (r.dates.length === 1 && r.i1 === r.i2 && inside.length === 1) {
-    await store.saveLesson({ ...inside[0], student: text });
+  if (!text || !rs.length) return;
+  const target = singleLesson();
+  if (target) {
+    await store.saveLesson({ ...target, student: text });
   } else {
+    // 範囲ごと・日ごとに1件ずつ作る
     const last = store.getLastInput();
-    await store.addLessons(r.dates.map(date => ({
+    await store.addLessons(rs.flatMap(r => r.dates.map(date => ({
       date, start: SLOTS[r.i1], duration: r.bottom - r.top,
       student: text, typeId: last.typeId, status: last.status, memo: '',
-    })), `文字を入力「${text}」`);
+    }))), `文字を入力「${text}」`);
   }
   onChanged();
 }
@@ -294,14 +370,16 @@ function readClipboard() {
 }
 
 async function copySelection({ cut = false } = {}) {
-  const r = range();
-  if (!r) return;
-  const items = lessonsInRange(r);
+  const rs = ranges();
+  if (!rs.length) return;
+  const items = lessonsInSelection();
   if (!items.length) return showToast(`${cut ? '切り取る' : 'コピーする'}予定がありません`);
-  // 選んだ範囲の左上からの「何日後・何分後」で覚える(貼り付け先でも同じ並びになる)
+  // 選んだ範囲(複数なら全体)の左上からの「何日後・何分後」で覚える(貼り付け先でも同じ並びになる)
+  const left = rs.reduce((a, b) => (b.c1 < a.c1 ? b : a)).dates[0];
+  const top = Math.min(...rs.map(r => r.top));
   const clip = items.map(l => ({
-    dayOffset: daysBetween(r.dates[0], l.date),
-    minOffset: toMinutes(l.start) - r.top,
+    dayOffset: daysBetween(left, l.date),
+    minOffset: toMinutes(l.start) - top,
     duration: l.duration, student: l.student, typeId: l.typeId, status: l.status, memo: l.memo || '',
   }));
   try { localStorage.setItem(CLIP_KEY, JSON.stringify(clip)); } catch { /* 保存できなくても続ける */ }
@@ -336,9 +414,8 @@ async function pasteSelection() {
 }
 
 async function deleteSelection() {
-  const r = range();
-  if (!r) return;
-  const items = lessonsInRange(r);
+  if (!anchor) return;
+  const items = lessonsInSelection();
   if (!items.length) return showToast('削除する予定がありません');
   // 「戻す」で元に戻せるので、確認は出さない(Numbers と同じ)
   await store.deleteLessons(items.map(l => l.id));
@@ -361,10 +438,9 @@ async function redo() {
 
 // return:1マスに予定が1件ならその入力画面、それ以外は「文字を入力」
 function editSelection() {
-  const r = range();
-  if (!r) return;
-  const inside = lessonsInRange(r);
-  if (r.dates.length === 1 && r.i1 === r.i2 && inside.length === 1) openExistingLesson(inside[0].id);
+  if (!anchor) return;
+  const target = singleLesson();
+  if (target) openExistingLesson(target.id);
   else openTextInput();
 }
 
@@ -380,7 +456,8 @@ function moveSelection(dCol, dRow, extend) {
     const col = Math.min(cols.length - 1, Math.max(0, cols.indexOf(from.date) + dCol));
     const idx = Math.min(SLOTS.length - 1, Math.max(0, from.idx + dRow));
     const next = { date: cols[col], idx };
-    if (extend) focus = next; else anchor = focus = next;
+    if (extend) focus = next;
+    else { anchor = focus = next; others = []; }
   }
   paint();
   table.querySelector(`td[data-date="${focus.date}"][data-time="${SLOTS[focus.idx]}"]`)
@@ -389,6 +466,7 @@ function moveSelection(dCol, dRow, extend) {
 
 function selectAll() {
   const cols = dateColumns();
+  others = [];
   anchor = { date: cols[0], idx: 0 };
   focus = { date: cols[cols.length - 1], idx: SLOTS.length - 1 };
   paint();

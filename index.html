@@ -16,6 +16,7 @@
       <button type="button" id="prev-month" class="btn" aria-label="前の月">◀ 前月</button>
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
       <button type="button" id="next-month" class="btn" aria-label="次の月">次月 ▶</button>
+      <button type="button" id="zoom-fit" class="btn zoom-btn" aria-pressed="false" title="2本指でつまむ・広げるでも拡大・縮小できます">1か月表示</button>
       <button type="button" id="open-settings" class="btn" aria-label="設定">⚙ 設定</button>
     </nav>
     <div class="legends">
@@ -40,6 +41,7 @@
   <div id="selection-bar" class="selection-bar" hidden>
     <span id="selection-info" class="selection-info"></span>
     <div class="selection-actions">
+      <button type="button" id="sel-multi" class="btn toggle-btn" aria-pressed="false" title="オンの間はタップでマスを追加で選べます(⇧を押しながらと同じ)">⇧ 追加選択</button>
       <button type="button" id="sel-text" class="btn">文字を入力</button>
       <button type="button" id="sel-copy" class="btn">コピー</button>
       <button type="button" id="sel-paste" class="btn">貼り付け</button>

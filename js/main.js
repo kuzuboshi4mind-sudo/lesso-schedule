@@ -4,6 +4,7 @@ import * as store from './store.js';
 import { openNewLesson, openExistingLesson, openDayNote, setOnChanged } from './editor.js';
 import { initSelection, afterRender, handleTap, clearSelection } from './selection.js';
 import { initSettings } from './settings.js';
+import { initZoom, refreshZoom } from './zoom.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -41,6 +42,7 @@ async function show({ keepScroll = false } = {}) {
   dayNotes = notes;
   const { scrollLeft, scrollTop } = scroller;
   renderCalendar(table, year, month, { lessons, dayNotes, types });
+  refreshZoom();
   renderLegend(types);
   afterRender(lessons);
   if (keepScroll) {
@@ -98,5 +100,6 @@ table.addEventListener('click', e => {
 setOnChanged(() => show({ keepScroll: true }));
 initSelection({ table, scroller, onChanged: () => show({ keepScroll: true }) });
 initSettings({ onChanged: () => show({ keepScroll: true }) });
+initZoom({ table, scroller });
 
 show();
