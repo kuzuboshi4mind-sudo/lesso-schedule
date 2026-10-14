@@ -178,10 +178,11 @@ export async function addLessons(lessons, label = '追加') {
   return added;
 }
 
-// まとめて削除する
+// まとめて削除する(ゴミ箱に入れる。30日間は「ゴミ箱」から元に戻せる)
 export async function deleteLessons(ids, label = '削除') {
-  const targets = await db.getLessonsByIds(ids);
-  await commit({ label: `${label}(${targets.length}件)`, lessons: targets.map(t => ({ before: t, after: null })) });
+  const targets = (await db.getLessonsByIds(ids)).filter(t => !t.deletedAt);
+  const now = new Date().toISOString();
+  await commit({ label: `${label}(${targets.length}件)`, lessons: targets.map(t => ({ before: t, after: { ...t, deletedAt: now } })) });
 }
 
 // 新規(id なし)なら追加、id ありなら上書き
@@ -192,10 +193,124 @@ export async function saveLesson(lesson) {
   return after;
 }
 
-// 手順6でゴミ箱方式に変える。今はすぐ消す(元に戻すことはできる)
+// 1件削除する(ゴミ箱に入れる)
 export async function deleteLesson(id) {
   const before = await getLesson(id);
-  if (before) await commit({ label: `削除:${nameOf(before)}`, lessons: [{ before, after: null }] });
+  if (before && !before.deletedAt) {
+    await commit({ label: `削除:${nameOf(before)}`, lessons: [{ before, after: { ...before, deletedAt: new Date().toISOString() } }] });
+  }
+}
+
+// ---- ゴミ箱 ----
+export const TRASH_DAYS = 30;   // ゴミ箱に残しておく日数
+
+// ゴミ箱の中の予定(新しく消した順)
+export async function getTrash() {
+  return db.listTrash();
+}
+
+// ゴミ箱から元に戻す(「戻す」でもう一度ゴミ箱へ戻せる)
+export async function restoreLessons(ids) {
+  const targets = (await db.getLessonsByIds(ids)).filter(t => t.deletedAt);
+  await commit({
+    label: targets.length === 1 ? `ゴミ箱から復元:${nameOf(targets[0])}` : `ゴミ箱から復元(${targets.length}件)`,
+    lessons: targets.map(t => ({ before: t, after: { ...t, deletedAt: null } })),
+  });
+  return targets;
+}
+
+// 30日より前にゴミ箱に入れた予定を完全に消す(アプリを開いたときに呼ぶ)
+export async function purgeOldTrash() {
+  const before = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
+  await db.purgeTrash(before);
+}
+
+// ---- バックアップ(ファイルへの書き出し・読み込み)----
+const BACKUP_APP = 'lesso-schedule';
+const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
+
+// 書き出すデータを作る。month を省くと全部
+// 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
+export async function buildBackup(year, month) {
+  const [from, to] = year ? monthRange(year, month) : ['0000-01-01', '9999-12-31'];
+  const [lessons, dayNotes, types, durationRules] = await Promise.all([
+    db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
+  ]);
+  const months = year
+    ? [`${year}-${String(month).padStart(2, '0')}`]
+    : [...new Set([...lessons.map(l => l.date), ...Object.keys(dayNotes)].map(d => d.slice(0, 7)))].sort();
+  return {
+    app: BACKUP_APP, version: 1, kind: year ? 'month' : 'all', months,
+    exportedAt: new Date().toISOString(),
+    lessons: lessons.map(({ deletedAt, ...l }) => l),
+    dayNotes,
+    settings: { types, durationRules },
+  };
+}
+
+export function markBackedUp() {
+  try { localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString()); } catch { /* 記録できなくても続ける */ }
+}
+
+// 最後に書き出した日時(この端末で。なければ null)
+export function lastBackupAt() {
+  try { return localStorage.getItem(LAST_BACKUP_KEY); } catch { return null; }
+}
+
+// 2つの予定の中身が同じか(ゴミ箱の印は比べない)
+const LESSON_FIELDS = ['date', 'start', 'duration', 'student', 'typeId', 'status', 'memo'];
+function sameLesson(a, b) {
+  return LESSON_FIELDS.every(k => (a[k] ?? '') === (b[k] ?? ''));
+}
+
+// 読み込んだファイルの中身を確かめる。おかしければ日本語のエラーを投げる
+export function checkBackup(data) {
+  if (!data || data.app !== BACKUP_APP || !Array.isArray(data.lessons) || !Array.isArray(data.months)) {
+    throw new Error('このアプリのバックアップファイルではないようです');
+  }
+  for (const l of data.lessons) {
+    if (!l.id || !/^\d{4}-\d{2}-\d{2}$/.test(l.date) || !/^\d{1,2}:\d{2}$/.test(l.start) || !(l.duration > 0)) {
+      throw new Error('バックアップファイルの中身が壊れているようです');
+    }
+  }
+  return data;
+}
+
+// バックアップを読み込む:ファイルに入っている月の予定と日ごとのメモを、ファイルの内容に置き換える
+// (今あってファイルにない予定はゴミ箱へ。この操作も「戻す」で元に戻せる)
+// withSettings が true なら、種類と色・換算表もファイルの内容に戻す
+export async function restoreBackup(data, { withSettings = false } = {}) {
+  checkBackup(data);
+  const now = new Date().toISOString();
+  const lessonChanges = [];
+  const noteChanges = [];
+  const backupIds = new Set(data.lessons.map(l => l.id));
+  for (const ym of data.months) {
+    const [y, m] = ym.split('-').map(Number);
+    const [from, to] = monthRange(y, m);
+    const [current, notes] = await Promise.all([db.listLessons(from, to), db.listNotes(from, to)]);
+    for (const l of current) {
+      if (!backupIds.has(l.id)) lessonChanges.push({ before: l, after: { ...l, deletedAt: now } });
+    }
+    const backupNotes = Object.fromEntries(Object.entries(data.dayNotes || {}).filter(([d]) => d >= from && d <= to));
+    for (const date of new Set([...Object.keys(notes), ...Object.keys(backupNotes)])) {
+      const before = notes[date] || null, after = backupNotes[date] || null;
+      if (before !== after) noteChanges.push({ date, before, after });
+    }
+  }
+  const existing = new Map((await db.getLessonsByIds([...backupIds])).map(l => [l.id, l]));
+  for (const l of data.lessons) {
+    const before = existing.get(l.id) || null;
+    const after = { ...l, deletedAt: null };
+    // 新しい予定・ゴミ箱に入っている予定・中身が違う予定だけを書き戻す
+    if (!before || before.deletedAt || !sameLesson(before, after)) lessonChanges.push({ before, after });
+  }
+  await commit({ label: `バックアップの読み込み(${data.months.join('・')})`, lessons: lessonChanges, notes: noteChanges });
+  if (withSettings && data.settings) {
+    if (data.settings.types) await saveTypes(data.settings.types);
+    if (data.settings.durationRules) await saveDurationRules(data.settings.durationRules);
+  }
+  return { lessons: data.lessons.length, changed: lessonChanges.length + noteChanges.length };
 }
 
 // 入力したことのある生徒名の一覧(入力欄の候補に出す)

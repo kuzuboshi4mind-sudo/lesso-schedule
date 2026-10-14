@@ -19,6 +19,7 @@ function fromRow(r) {
   return {
     id: r.id, date: r.date, start: r.start, duration: r.duration,
     student: r.student, typeId: r.type_id, status: r.status, memo: r.memo,
+    deletedAt: r.deleted_at || null,
   };
 }
 
@@ -26,16 +27,29 @@ function toRow(l) {
   return {
     id: l.id, date: l.date, start: l.start, duration: l.duration,
     student: l.student || '', type_id: l.typeId || '', status: l.status || 'tentative', memo: l.memo || '',
+    deleted_at: l.deletedAt || null,
     updated_at: new Date().toISOString(),
   };
 }
 
-const LESSON_COLUMNS = 'id,date,start,duration,student,type_id,status,memo';
+const LESSON_COLUMNS = 'id,date,start,duration,student,type_id,status,memo,deleted_at';
 
 export async function listLessons(from, to) {
   const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS)
     .gte('date', from).lte('date', to).is('deleted_at', null));
   return rows.map(fromRow);
+}
+
+// ゴミ箱の中の予定(ゴミ箱に入れた日時が新しい順)
+export async function listTrash() {
+  const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS)
+    .not('deleted_at', 'is', null).order('deleted_at', { ascending: false }).limit(2000));
+  return rows.map(fromRow);
+}
+
+// before(日時の文字列)より前にゴミ箱に入れた予定を、完全に消す
+export async function purgeTrash(before) {
+  check(await supabase.from('lessons').delete().lt('deleted_at', before));
 }
 
 export async function getLessonsByIds(ids) {

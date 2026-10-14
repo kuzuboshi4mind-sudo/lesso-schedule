@@ -27,9 +27,24 @@ function save(key, value) {
 
 export const label = 'この端末';
 
-// from〜to(どちらも '2026-10-01' の形、両端を含む)の予定
+// ゴミ箱に入っていない予定だけ
+function alive() {
+  return load(KEYS.lessons, []).filter(l => !l.deletedAt);
+}
+
+// from〜to(どちらも '2026-10-01' の形、両端を含む)の予定(ゴミ箱の中は除く)
 export async function listLessons(from, to) {
-  return load(KEYS.lessons, []).filter(l => l.date >= from && l.date <= to);
+  return alive().filter(l => l.date >= from && l.date <= to);
+}
+
+// ゴミ箱の中の予定(deletedAt が新しい順)
+export async function listTrash() {
+  return load(KEYS.lessons, []).filter(l => l.deletedAt).sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+}
+
+// before(日時の文字列)より前にゴミ箱に入れた予定を、完全に消す
+export async function purgeTrash(before) {
+  save(KEYS.lessons, load(KEYS.lessons, []).filter(l => !l.deletedAt || l.deletedAt >= before));
 }
 
 export async function getLessonsByIds(ids) {
@@ -38,11 +53,11 @@ export async function getLessonsByIds(ids) {
 }
 
 export async function countLessonsOfType(typeId) {
-  return load(KEYS.lessons, []).filter(l => l.typeId === typeId).length;
+  return alive().filter(l => l.typeId === typeId).length;
 }
 
 export async function studentNames() {
-  return load(KEYS.lessons, []).map(l => l.student);
+  return alive().map(l => l.student);
 }
 
 // states:[{ id, lesson }](lesson が null なら削除、あれば追加か上書き)

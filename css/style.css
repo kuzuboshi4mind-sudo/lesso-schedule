@@ -766,3 +766,22 @@ body.locked > :not(#login-screen) { display: none !important; }
   font-size: 16px;
 }
 .login-submit { width: 100%; min-height: 50px; font-size: 1.05rem; }
+
+/* =========================================================
+   ゴミ箱・バックアップ
+   ========================================================= */
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+.trash-count { font-size: 0.9rem; color: var(--muted); font-weight: 400; }
+.trash-list { margin: 0; padding: 0; list-style: none; }
+.trash-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.trash-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trash-main span { color: var(--text); font-size: 0.95rem; }
+.trash-main small { color: var(--muted); }
+.trash-empty { padding: 24px 0; text-align: center; color: var(--muted); }

@@ -191,7 +191,7 @@ form.addEventListener('submit', async e => {
 
 f.del.addEventListener('click', async () => {
   if (!editing?.id) return;
-  if (!confirm(`「${editing.student || '(名前なし)'}」の予定を削除しますか?`)) return;
+  if (!confirm(`「${editing.student || '(名前なし)'}」の予定を削除しますか?\n(ゴミ箱に入ります。30日間は元に戻せます)`)) return;
   await store.deleteLesson(editing.id);
   dialog.close();
   onChanged();

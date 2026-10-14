@@ -175,6 +175,24 @@
     </section>
 
     <section class="settings-section">
+      <h3>ゴミ箱</h3>
+      <p class="sheet-note">削除した予定は、30日間ゴミ箱に残ります。そのあいだは元に戻せます。</p>
+      <button type="button" id="open-trash" class="btn">🗑 ゴミ箱を開く</button>
+    </section>
+
+    <section class="settings-section">
+      <h3>バックアップ</h3>
+      <p class="sheet-note">予定をファイルに書き出して、iPad の「ファイル」などに保管できます。書き出したファイルを読み込むと、その内容に戻せます。</p>
+      <p id="last-backup" class="sheet-note"></p>
+      <div class="button-row">
+        <button type="button" id="export-month" class="btn">表示中の月を書き出す</button>
+        <button type="button" id="export-all" class="btn">全部を書き出す</button>
+        <button type="button" id="import-backup" class="btn">ファイルから読み込む</button>
+      </div>
+      <input type="file" id="backup-file" accept=".json,application/json" hidden>
+    </section>
+
+    <section class="settings-section">
       <h3>種類と色</h3>
       <p class="sheet-note">色の丸をタップすると色を選べます。上から順に、入力画面と色の見本に並びます。</p>
       <ul id="type-list" class="type-list"></ul>
@@ -189,6 +207,30 @@
       </table>
       <button type="button" id="add-rule" class="btn">+ 長さを追加</button>
     </section>
+  </dialog>
+
+  <!-- ゴミ箱 -->
+  <dialog id="trash-dialog" class="sheet">
+    <div class="sheet-head">
+      <h2 tabindex="-1">ゴミ箱 <span id="trash-count" class="trash-count"></span></h2>
+      <button type="button" class="btn btn-primary" data-close>閉じる</button>
+    </div>
+    <p class="sheet-note">削除してから30日を過ぎた予定は、自動で完全に消えます。</p>
+    <ul id="trash-list" class="trash-list"></ul>
+  </dialog>
+
+  <!-- バックアップの保存 -->
+  <dialog id="save-dialog" class="sheet sheet-small">
+    <div class="sheet-head">
+      <h2 tabindex="-1">バックアップを保存</h2>
+      <button type="button" class="btn" data-close>閉じる</button>
+    </div>
+    <p id="save-name" class="sheet-note"></p>
+    <div class="button-row">
+      <a id="save-link" class="btn btn-primary" href="#" download>ファイルを保存</a>
+      <button type="button" id="save-share" class="btn" hidden>共有…(「ファイルに保存」など)</button>
+    </div>
+    <p class="sheet-note">iPad・iPhone では「ファイル」アプリの「ダウンロード」に保存されます。</p>
   </dialog>
 
   <!-- 日ごとのメモ(「予定」の行)の入力画面 -->

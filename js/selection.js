@@ -451,7 +451,7 @@ async function deleteSelection() {
   if (!items.length) return showToast('削除する予定がありません');
   // 「戻す」で元に戻せるので、確認は出さない(Numbers と同じ)
   await store.deleteLessons(items.map(l => l.id));
-  showToast(`${items.length}件削除しました(「戻す」で元に戻せます)`);
+  showToast(`${items.length}件削除しました(「戻す」かゴミ箱から元に戻せます)`);
   onChanged();
 }
 

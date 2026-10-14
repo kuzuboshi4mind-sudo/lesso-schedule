@@ -6,6 +6,7 @@ import { initSelection, afterRender, handleTap, clearSelection } from './selecti
 import { initSettings } from './settings.js';
 import { initZoom, refreshZoom } from './zoom.js';
 import { requireLogin, watchLogout, logout } from './login.js';
+import { initTrashBackup, showLastBackup } from './trash-backup.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -102,6 +103,8 @@ setOnChanged(() => show({ keepScroll: true }));
 initSelection({ table, scroller, onChanged: () => show({ keepScroll: true }) });
 initSettings({ onChanged: () => show({ keepScroll: true }) });
 initZoom({ table, scroller });
+initTrashBackup({ getMonth: () => current, onChanged: () => show({ keepScroll: true }) });
+document.getElementById('open-settings').addEventListener('click', showLastBackup);
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)
 window.addEventListener('unhandledrejection', e => {
@@ -122,6 +125,8 @@ async function start() {
     info.textContent = 'この端末の中に保存しています(クラウドは未設定)。ほかの端末とは共有されません。';
   }
   show();
+  // 30日より前にゴミ箱に入れた予定を完全に消す(失敗しても表示には影響しない)
+  store.purgeOldTrash().catch(err => console.warn(err));
 }
 
 start();
