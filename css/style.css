@@ -728,6 +728,6 @@ body.has-selection .calendar-scroll { padding-bottom: 130px; }
 
 /* 表の大きさボタン(1か月を1画面に / 元の大きさ) */
 .zoom-btn[aria-pressed="true"] { background: var(--head); border-color: var(--accent); color: var(--accent); font-weight: 700; }
-/* ピンチで拡大・縮小している最中は、表の中の文字選択などを出さない */
-.calendar-scroll { touch-action: pan-x pan-y; }
+/* 長押しのあと指でなぞっている間は、表がスクロールしないように止める */
+.calendar-scroll.drag-lock { overflow: hidden; }
 .toggle-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }

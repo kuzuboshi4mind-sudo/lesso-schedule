@@ -1,5 +1,6 @@
 // マスの選択(Numbers のような操作)
 // ・長押し → そのマスを選択。指を離さずになぞると範囲を選択できる
+// ・選んである範囲に指を置いてなぞる → 長押しなしで範囲を広げられる(Numbers の範囲の端をドラッグするのと同じ)
 // ・選択中にタップ → そのマスだけを選択し直す
 // ・⇧(Shift)を押しながら長押し・タップ・クリック → 離れたマスを追加で選ぶ(複数選択)。
 //   もう一度 ⇧+タップすると、そのマスの選択を外す。キーボードがないときは操作バーの「⇧ 追加選択」を使う
@@ -26,6 +27,7 @@ let others = [];             // 複数選択のとき、ほかに選んである
 let multiMode = false;       // 操作バーの「⇧ 追加選択」がオンのとき true
 let pressAdd = false;        // 長押しを始めたときに ⇧ が押されていたか
 let dragging = false;        // 長押しのあと、なぞって範囲を選んでいる最中
+let dragMoved = false;       // なぞる操作で実際に指が動いたか(動かなければタップとして扱う)
 let pressTimer = null;
 let pressStart = null;
 let suppressClickUntil = 0;  // 長押しの指を離した直後に来るタップを無視する(この時刻まで)
@@ -106,7 +108,7 @@ export function clearSelection() {
   anchor = focus = null;
   others = [];
   multiMode = false;
-  dragging = false;
+  endDrag();
   paint();
 }
 
@@ -133,8 +135,15 @@ function toggleCell(cell) {
 // ---------------------------------------------------------
 function onTouchStart(e) {
   lastTouchAt = Date.now();
-  if (e.touches.length !== 1) return cancelPress();
+  if (e.touches.length !== 1) { endDrag(); return cancelPress(); }
   const t = e.touches[0];
+  // 選んである範囲の上に指を置いたときは、長押しを待たずになぞって広げられるようにする
+  const cell = anchor && cellAt(t.clientX, t.clientY);
+  if (cell && isInActiveRange(cell)) {
+    cancelPress();
+    beginDrag(false);
+    return;
+  }
   beginPress(t.clientX, t.clientY, e.shiftKey);
 }
 
@@ -143,6 +152,7 @@ function onTouchMove(e) {
   const t = e.touches[0];
   if (dragging) {
     e.preventDefault();           // なぞっている間は表をスクロールさせない
+    dragMoved = true;
     extendTo(t.clientX, t.clientY);
   } else if (pressStart && moved(t.clientX, t.clientY)) {
     cancelPress();
@@ -151,12 +161,15 @@ function onTouchMove(e) {
 
 function onMouseDown(e) {
   if (e.button !== 0 || Date.now() - lastTouchAt < 800) return;
+  // Mac:選んである範囲の上で押してドラッグすると、範囲を広げられる
+  const cell = anchor && !e.shiftKey && !e.metaKey && cellAt(e.clientX, e.clientY);
+  if (cell && isInActiveRange(cell)) { beginDrag(false); return; }
   beginPress(e.clientX, e.clientY, e.shiftKey || e.metaKey);
 }
 
 function onMouseMove(e) {
   if (Date.now() - lastTouchAt < 800) return;
-  if (dragging) extendTo(e.clientX, e.clientY);
+  if (dragging) { dragMoved = true; extendTo(e.clientX, e.clientY); }
   else if (pressStart && moved(e.clientX, e.clientY)) cancelPress();
 }
 
@@ -169,16 +182,35 @@ function beginPress(x, y, add) {
   pressTimer = setTimeout(() => {
     pressTimer = null;
     startSelection(cell, pressAdd);
-    dragging = true;
+    beginDrag(true);
   }, LONG_PRESS_MS);
+}
+
+// なぞる操作を始める。fromLongPress:長押しから始まったか(そのときは指を離したあとのタップを無視する)
+function beginDrag(fromLongPress) {
+  dragging = true;
+  dragMoved = fromLongPress;
+  scroller.classList.add('drag-lock');   // なぞっている間は表を動かさない(iPad でスクロールに取られないように)
+}
+
+function endDrag() {
+  dragging = false;
+  scroller.classList.remove('drag-lock');
 }
 
 function onPressEnd() {
   cancelPress();
   if (dragging) {
-    dragging = false;
-    suppressClickUntil = Date.now() + 350;
+    // 指が動いていなければふつうのタップとして扱う(選び直し)
+    if (dragMoved) suppressClickUntil = Date.now() + 350;
+    endDrag();
   }
+}
+
+// いま選んでいる範囲(最後に選んだ範囲)の中のマスか
+function isInActiveRange(cell) {
+  const r = range();
+  return !!r && r.dates.includes(cell.date) && cell.idx >= r.i1 && cell.idx <= r.i2;
 }
 
 function cancelPress() {
