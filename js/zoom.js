@@ -5,7 +5,9 @@
 // ・Mac:⌘ を押しながらスクロール(またはトラックパッドのピンチ)で拡大・縮小
 // 大きさは端末ごとに覚えておく(次に開いたときも同じ大きさ)
 
-const BASE = { timeCol: 56, dayCol: 58, row: 34, headRows: 34 + 26 + 40, rows: 36 };
+const BASE = { timeCol: 56, dayCol: 58, headRows: 34 + 26 + 40, rows: 36 };
+// 30分の行の高さ(拡大率1のとき)。スマホでは小さいので、CSS の --row-base から読む
+const baseRow = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-base')) || 34;
 const MAX = 1.8;            // いちばん大きくしたとき(元の1.8倍)
 const SAVE_KEY = 'lesso.zoom';
 
@@ -51,7 +53,7 @@ function fitScale() {
     const zf = fontScale(fx, fy);
     const timeCol = BASE.timeCol * Math.max(zf, 0.8);
     fx = (w - timeCol - 4) / (days * BASE.dayCol);
-    fy = (h - BASE.headRows * zf - 4) / (BASE.rows * BASE.row);
+    fy = (h - BASE.headRows * zf - 4) / (BASE.rows * baseRow());
   }
   return { fx: Math.min(fx, 1), fy: Math.min(fy, 1) };
 }

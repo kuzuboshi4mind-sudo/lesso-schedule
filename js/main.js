@@ -16,7 +16,7 @@ const title = document.getElementById('month-title');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '手順8(2026-10-15)';
+const APP_VERSION = '手順8+スマホの行(2026-10-15)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)

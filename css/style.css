@@ -26,7 +26,8 @@
   --zf: 1;
   --time-col: calc(56px * max(var(--zf), 0.8));  /* 時刻の列の幅 */
   --day-col: calc(58px * var(--zx));             /* 日付の列の幅 */
-  --row: calc(34px * var(--zy));                 /* 30分の行の高さ */
+  --row-base: 34px;                              /* 30分の行の高さ(拡大率1のとき。スマホは下で小さくする) */
+  --row: calc(var(--row-base) * var(--zy));      /* 30分の行の高さ */
   --h-date: calc(34px * var(--zf));              /* 日付の行の高さ */
   --h-week: calc(26px * var(--zf));              /* 曜日の行の高さ */
   --h-memo: calc(40px * var(--zf));              /* メモの行の高さ */
@@ -285,6 +286,17 @@ body {
 /* 短いレッスン(15分・20分)は名前だけ */
 .lesson.short .lesson-dur { display: none; }
 .lesson.short { font-size: 0.92em; padding-top: 0; padding-bottom: 0; }
+
+/* スマホ(幅がせまい、または横向きで高さが低い画面)は、30分の行の高さを 2/3 にする
+   iPad はどちらの向きでも当てはまらないので、今までどおり */
+@media (max-width: 600px), (max-height: 500px) {
+  :root { --row-base: 23px; }
+  /* 30分以下の予定は、名前を1行にして収める */
+  .lesson.half { padding-top: 0; padding-bottom: 0; }
+  .lesson.half .lesson-name { white-space: nowrap; text-overflow: ellipsis; }
+  /* 15分・20分は高さが小さいので、文字を小さくし、枠を細くする */
+  .calendar .lesson.short { font-size: 0.68em; line-height: 1; padding: 0 2px; border-width: 1px; border-radius: 3px; }
+}
 
 /* =========================================================
    予定の状態:確約=濃い色+◯、仮=薄い色+点線、キャンセル=灰色+×
