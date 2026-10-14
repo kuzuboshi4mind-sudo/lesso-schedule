@@ -5,5 +5,5 @@
 // ・「秘密のキー(secret key、sb_secret_ で始まる)」は絶対にここに入れない。
 // ・両方とも空のときは、これまでどおり この端末の中だけに保存する。
 
-export const SUPABASE_URL = '';
-export const SUPABASE_PUBLISHABLE_KEY = '';
+export const SUPABASE_URL = 'https://xqkdqnahwatdgicfrryl.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_hxufEIj1yKCgZSeZDIOYEA_afwIJA2y';
