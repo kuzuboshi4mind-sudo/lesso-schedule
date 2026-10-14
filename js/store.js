@@ -141,6 +141,7 @@ async function applyChange(entry, useAfter) {
   const noteStates = entry.notes.map(c => ({ date: c.date, text: pick(c) }));
   const studentStates = entry.students.map(c => ({ id: (c.after || c.before).id, student: pick(c) }));
   for (const c of entry.settings) await db.setSetting(c.key, pick(c));
+  if (entry.months.length) await db.writeMonths(entry.months.map(c => ({ ym: c.ym, tentative: pick(c) })));
   if (slotStates.length) await db.writeSlots(slotStates);
   if (excStates.length) await db.writeExceptions(excStates);
   if (lessonStates.length) await db.writeLessons(lessonStates);
@@ -151,13 +152,14 @@ async function applyChange(entry, useAfter) {
 // 変更を書き込んで記録する。label は「元に戻しました:〇〇」の表示に使う
 // change = { label, lessons:[{ before, after }], notes:[{ date, before, after }],
 //            slots:[{ before, after }], exceptions:[{ before, after }], students:[{ before, after }],
-//            settings:[{ key, before, after }] }
+//            settings:[{ key, before, after }], months:[{ ym, before, after }](仮の月か)}
 // 書き込みに失敗したときは記録しない(エラーはそのまま呼んだ側に伝える)
 async function commit(change) {
   const entry = {
     label: change.label, lessons: change.lessons || [], notes: change.notes || [],
     slots: change.slots || [], exceptions: change.exceptions || [], students: change.students || [],
     settings: change.settings || [],
+    months: change.months || [],
   };
   await applyChange(entry, true);
   undoStack.push(entry);
@@ -499,9 +501,9 @@ const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
 // 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
 export async function buildBackup(year, month) {
   const [from, to] = year ? monthRange(year, month) : ['0000-01-01', '9999-12-31'];
-  const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents] = await Promise.all([
+  const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents, tentativeMonths] = await Promise.all([
     db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
-    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'), db.listStudents(), getHiddenStudents(),
+    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'), db.listStudents(), getHiddenStudents(), db.listMonths(),
   ]);
   const months = year
     ? [`${year}-${String(month).padStart(2, '0')}`]
@@ -514,6 +516,7 @@ export async function buildBackup(year, month) {
     settings: { types, durationRules, hiddenStudents },
     recurring: { slots, exceptions },   // 毎週の固定枠(どの月の書き出しにも全部入れる)
     students,                           // 生徒メモ(どの月の書き出しにも全部入れる)
+    tentativeMonths: months.filter(ym => tentativeMonths[ym]),   // 仮の月
   };
 }
 
@@ -599,7 +602,17 @@ export async function restoreBackup(data, { withSettings = false } = {}) {
       if (!before || before.name !== x.name || before.memo !== x.memo) studentChanges.push({ before, after: x });
     }
   }
+  // 仮の月かどうかも、ファイルの内容にそろえる(この情報が入っていない古いファイルなら今のまま)
+  const monthChanges = [];
+  if (Array.isArray(data.tentativeMonths)) {
+    const current = await db.listMonths();
+    for (const ym of data.months) {
+      const before = !!current[ym], after = data.tentativeMonths.includes(ym);
+      if (before !== after) monthChanges.push({ ym, before, after });
+    }
+  }
   await commit({
+    months: monthChanges,
     label: `バックアップの読み込み(${data.months.join('・')})`,
     lessons: lessonChanges, notes: noteChanges, slots: slotChanges, exceptions: excChanges, students: studentChanges,
   });
@@ -770,4 +783,19 @@ export async function renameStudent(oldName, newName) {
     lessons: lessonChanges, slots: slotChanges, students: studentChanges,
   });
   return lessonChanges.length + slotChanges.length;
+}
+
+// ---- 仮の月 ----
+// 確定していない月は「仮」にできる(Numbers の「6月仮」のタブと同じ)
+const ymOf = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
+
+export async function isTentativeMonth(year, month) {
+  return !!(await db.listMonths())[ymOf(year, month)];
+}
+
+export async function setTentativeMonth(year, month, tentative) {
+  const ym = ymOf(year, month);
+  const before = !!(await db.listMonths())[ym];
+  if (before === tentative) return;
+  await commit({ label: `${month}月を${tentative ? '仮' : '確定'}にする`, months: [{ ym, before, after: tentative }] });
 }

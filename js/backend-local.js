@@ -146,3 +146,20 @@ export async function writeStudents(states) {
 export async function lessonsOfStudent(name) {
   return alive().filter(l => l.student === name);
 }
+
+// ---- 月ごとの情報(仮の月か)----
+// { '2026-11': true, ... }(仮の月だけを覚える)
+const MONTH_KEY = 'lesso.months';
+
+export async function listMonths() {
+  return load(MONTH_KEY, {});
+}
+
+// states:[{ ym:'2026-11', tentative:true }]
+export async function writeMonths(states) {
+  const all = load(MONTH_KEY, {});
+  for (const { ym, tentative } of states) {
+    if (tentative) all[ym] = true; else delete all[ym];
+  }
+  save(MONTH_KEY, all);
+}

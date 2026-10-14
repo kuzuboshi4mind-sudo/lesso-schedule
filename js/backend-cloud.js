@@ -171,3 +171,13 @@ export async function lessonsOfStudent(name) {
   const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS).eq('student', name).is('deleted_at', null));
   return rows.map(fromRow);
 }
+
+// ---- 月ごとの情報(仮の月か)----
+export async function listMonths() {
+  const rows = check(await supabase.from('months').select('ym,tentative').eq('tentative', true));
+  return Object.fromEntries(rows.map(r => [r.ym, true]));
+}
+
+export async function writeMonths(states) {
+  if (states.length) check(await supabase.from('months').upsert(states.map(s => ({ ym: s.ym, tentative: !!s.tentative }))));
+}

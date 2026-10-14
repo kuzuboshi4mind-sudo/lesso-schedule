@@ -13,7 +13,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="レッスン">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#128679">
+  <meta name="theme-color" content="#f3f8f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1716" media="(prefers-color-scheme: dark)">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/main.js"></script>
 </head>
@@ -40,16 +41,18 @@
   <header class="app-header">
     <div class="title-group">
       <h1 id="month-title" class="month-title">----年--月</h1>
+      <!-- 仮の月かどうか(タップで 確定 ⇔ 仮 を切り替え) -->
+      <button type="button" id="month-status" class="month-status" aria-pressed="false" title="タップで「仮」と「確定」を切り替えます">確定</button>
       <!-- その月の集計(タップで詳しく) -->
       <button type="button" id="summary-chip" class="summary-chip" aria-label="この月の集計を見る"></button>
     </div>
     <nav class="month-nav" aria-label="月の切り替え">
-      <button type="button" id="prev-month" class="btn" aria-label="前の月">◀ 前月</button>
+      <button type="button" id="prev-month" class="btn" aria-label="前の月">◀<span class="btn-label"> 前月</span></button>
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
-      <button type="button" id="next-month" class="btn" aria-label="次の月">次月 ▶</button>
+      <button type="button" id="next-month" class="btn" aria-label="次の月"><span class="btn-label">次月 </span>▶</button>
       <button type="button" id="zoom-fit" class="btn zoom-btn" aria-pressed="false" title="2本指でつまむ・広げるでも拡大・縮小できます">1か月表示</button>
-      <button type="button" id="open-students" class="btn" aria-label="生徒メモ">👤 生徒</button>
-      <button type="button" id="open-settings" class="btn" aria-label="設定">⚙ 設定</button>
+      <button type="button" id="open-students" class="btn" aria-label="生徒メモ">👤<span class="btn-label"> 生徒</span></button>
+      <button type="button" id="open-settings" class="btn" aria-label="設定">⚙<span class="btn-label"> 設定</span></button>
     </nav>
     <div class="legends">
       <!-- 種類と色の見本 -->

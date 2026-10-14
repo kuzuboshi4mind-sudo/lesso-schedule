@@ -18,6 +18,7 @@
   --today-head: #f6d84a;
   --sun: #d0473c;           /* 日曜・祝日の文字 */
   --sat: #2f6fd0;           /* 土曜の文字 */
+  --tentative: #e07b1a;     /* 仮の月の印(オレンジ。Numbers の「予定」の行と同じ系統) */
   --danger: #c0392b;        /* 削除ボタン */
 
   /* 大きさ。--zx(横)・--zy(縦)・--zf(文字)は表の拡大率で、ピンチ操作に合わせて js/zoom.js が変える */
@@ -51,6 +52,7 @@
     --today-head: #7a6a12;
     --sun: #ff8a7e;
     --sat: #84b3ff;
+    --tentative: #ffa552;
     --danger: #ff7b6e;
   }
 }
@@ -941,3 +943,49 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .hidden-students { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
 .hidden-students summary { min-height: 44px; display: flex; align-items: center; color: var(--muted); cursor: pointer; }
 .hidden-student { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 4px; }
+
+/* =========================================================
+   仮の月
+   ========================================================= */
+.month-status {
+  min-height: 36px;
+  min-width: 52px;
+  padding: 0 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 18px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.month-status[aria-pressed="true"] {
+  border: 2px solid var(--tentative);
+  background: var(--tentative);
+  color: #fff;
+  font-weight: 700;
+}
+body.month-tentative .month-title { color: var(--tentative); }
+/* 表の上の端をオレンジの点線にして、仮の月だとわかるように */
+body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative); }
+
+/* =========================================================
+   スマホ:上の帯を小さくして、表を広く見せる
+   (幅がせまい、または横向きで高さが低い画面。iPad は当てはまらない)
+   ========================================================= */
+@media (max-width: 600px), (max-height: 500px) {
+  .app-header { gap: 6px 10px; padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: 6px; }
+  .month-title { font-size: 1.25rem; }
+  .title-group { gap: 8px; }
+  .summary-chip { min-height: 36px; padding: 0 10px; font-size: 0.85rem; }
+  .summary-chip strong { font-size: 1rem; }
+  .month-nav { gap: 6px; flex-wrap: nowrap; }
+  .month-nav .btn { min-height: 40px; min-width: 40px; padding: 0 10px; font-size: 0.95rem; }
+  .btn-label { display: none; }   /* 「前月」「次月」「生徒」「設定」の文字をかくして、印だけにする */
+  /* 色と状態の見本は1行にして、横にスクロール */
+  .legends { flex-wrap: nowrap; overflow-x: auto; gap: 16px; padding-bottom: 2px; scrollbar-width: none; }
+  .legends::-webkit-scrollbar { display: none; }
+  .type-legend, .status-legend { flex-wrap: nowrap; flex: none; white-space: nowrap; }
+  .type-legend { gap: 10px; }
+}

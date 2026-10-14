@@ -14,10 +14,11 @@ import { initSummary, updateSummary } from './summary.js';
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
 const title = document.getElementById('month-title');
+const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '手順9+生徒の削除(2026-10-15)';
+const APP_VERSION = '手順10(2026-10-15)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -45,9 +46,11 @@ async function show({ keepScroll = false } = {}) {
   document.title = `${month}月 レッスンスケジュール`;
   history.replaceState(null, '', `#${year}-${String(month).padStart(2, '0')}`);
 
-  const [lessons, notes, types, rules] = await Promise.all([
+  const [lessons, notes, types, rules, tentative] = await Promise.all([
     store.getLessons(year, month), store.getDayNotes(year, month), store.getTypes(), store.getDurationRules(),
+    store.isTentativeMonth(year, month),
   ]);
+  showMonthStatus(tentative);
   dayNotes = notes;
   const { scrollLeft, scrollTop } = scroller;
   renderCalendar(table, year, month, { lessons, dayNotes, types });
@@ -62,6 +65,21 @@ async function show({ keepScroll = false } = {}) {
     scrollToToday();
   }
 }
+
+// 仮の月:月の名前の横の印を「仮」に、表の見出しをオレンジの点線で囲む
+function showMonthStatus(tentative) {
+  monthStatus.textContent = tentative ? '仮' : '確定';
+  monthStatus.setAttribute('aria-pressed', String(tentative));
+  monthStatus.setAttribute('aria-label', tentative ? 'この月は仮です(タップで確定にする)' : 'この月は確定です(タップで仮にする)');
+  document.body.classList.toggle('month-tentative', tentative);
+  document.title = `${current.month}月${tentative ? '仮' : ''} レッスンスケジュール`;
+}
+
+monthStatus.addEventListener('click', async () => {
+  const tentative = monthStatus.getAttribute('aria-pressed') !== 'true';
+  showMonthStatus(tentative);   // 先に見た目を変える(保存は後ろで)
+  await store.setTentativeMonth(current.year, current.month, tentative);
+});
 
 function renderLegend(types) {
   legend.innerHTML = types.map(t =>
