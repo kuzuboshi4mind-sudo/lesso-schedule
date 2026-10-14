@@ -38,7 +38,11 @@
 
   <!-- 上の帯:月の表示と切り替えボタン -->
   <header class="app-header">
-    <h1 id="month-title" class="month-title">----年--月</h1>
+    <div class="title-group">
+      <h1 id="month-title" class="month-title">----年--月</h1>
+      <!-- その月の集計(タップで詳しく) -->
+      <button type="button" id="summary-chip" class="summary-chip" aria-label="この月の集計を見る"></button>
+    </div>
     <nav class="month-nav" aria-label="月の切り替え">
       <button type="button" id="prev-month" class="btn" aria-label="前の月">◀ 前月</button>
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
@@ -259,6 +263,15 @@
       <button type="button" id="save-share" class="btn" hidden>共有…(「ファイルに保存」など)</button>
     </div>
     <p class="sheet-note">iPad・iPhone では「ファイル」アプリの「ダウンロード」に保存されます。</p>
+  </dialog>
+
+  <!-- 集計 -->
+  <dialog id="summary-dialog" class="sheet">
+    <div class="sheet-head">
+      <h2 id="summary-title" tabindex="-1">集計</h2>
+      <button type="button" class="btn btn-primary" data-close>閉じる</button>
+    </div>
+    <div id="summary-body"></div>
   </dialog>
 
   <!-- 固定枠の予定を変える・消すときに「この日だけ / この日以降」を選ぶ画面 -->

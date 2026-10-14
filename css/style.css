@@ -840,3 +840,31 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .skip-range { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--head); }
 .skip-range label { display: inline-flex; align-items: center; gap: 6px; }
 .sheet select.repeat-select { width: auto; min-width: 220px; }
+
+/* =========================================================
+   集計
+   ========================================================= */
+.title-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.summary-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.summary-chip strong { color: var(--accent); font-size: 1.1rem; }
+.summary-table { width: 100%; border-collapse: collapse; margin: 4px 0 12px; font-variant-numeric: tabular-nums; }
+.summary-table th, .summary-table td { padding: 10px 8px; vertical-align: middle; border-bottom: 1px solid var(--line); text-align: right; }
+.summary-table th[scope="row"], .summary-table thead th:first-child { text-align: left; }
+.summary-table thead th { font-size: 0.85rem; color: var(--muted); }
+.summary-table th[scope="row"] { font-weight: 600; white-space: nowrap; }
+.summary-table th[scope="row"] .legend-swatch { display: inline-block; margin-right: 8px; vertical-align: -2px; }
+.summary-table tfoot th, .summary-table tfoot td { border-top: 2px solid var(--line-strong); border-bottom: none; font-size: 1.05rem; }
+.summary-table td strong { font-size: 1.1rem; }
+.summary-table .tentative-col { color: var(--muted); }
+.summary-table .tentative-col strong { color: var(--muted); }
+.muted { color: var(--muted); }
