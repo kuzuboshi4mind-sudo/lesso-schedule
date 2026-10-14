@@ -288,7 +288,12 @@
       <button type="button" id="students-add" class="btn">＋ 生徒を追加</button>
     </div>
     <ul id="students-list" class="students-list"></ul>
-    <p class="sheet-note">予定に入れた名前は、ここに自動で並びます。タップするとメモを書けます。</p>
+    <p class="sheet-note">レッスンの予定に入れた名前は、ここに自動で並びます(「なし(自分の予定)」と、集計に入れない種類の予定は並びません)。タップするとメモを書けます。</p>
+    <!-- 削除した生徒(一覧に戻せる) -->
+    <details id="hidden-students" class="hidden-students" hidden>
+      <summary id="hidden-students-title">削除した生徒</summary>
+      <ul id="hidden-students-list" class="students-list"></ul>
+    </details>
   </dialog>
 
   <!-- 生徒メモ1人分 -->
@@ -311,7 +316,7 @@
       </label>
       <div id="student-info" class="student-info"></div>
       <div class="sheet-actions">
-        <button type="button" id="student-delete" class="btn btn-danger">この生徒メモを削除</button>
+        <button type="button" id="student-delete" class="btn btn-danger">この生徒を削除</button>
       </div>
     </form>
   </dialog>

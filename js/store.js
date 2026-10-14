@@ -140,6 +140,7 @@ async function applyChange(entry, useAfter) {
   const lessonStates = entry.lessons.map(c => ({ id: (c.after || c.before).id, lesson: pick(c) }));
   const noteStates = entry.notes.map(c => ({ date: c.date, text: pick(c) }));
   const studentStates = entry.students.map(c => ({ id: (c.after || c.before).id, student: pick(c) }));
+  for (const c of entry.settings) await db.setSetting(c.key, pick(c));
   if (slotStates.length) await db.writeSlots(slotStates);
   if (excStates.length) await db.writeExceptions(excStates);
   if (lessonStates.length) await db.writeLessons(lessonStates);
@@ -149,12 +150,14 @@ async function applyChange(entry, useAfter) {
 
 // 変更を書き込んで記録する。label は「元に戻しました:〇〇」の表示に使う
 // change = { label, lessons:[{ before, after }], notes:[{ date, before, after }],
-//            slots:[{ before, after }], exceptions:[{ before, after }], students:[{ before, after }] }
+//            slots:[{ before, after }], exceptions:[{ before, after }], students:[{ before, after }],
+//            settings:[{ key, before, after }] }
 // 書き込みに失敗したときは記録しない(エラーはそのまま呼んだ側に伝える)
 async function commit(change) {
   const entry = {
     label: change.label, lessons: change.lessons || [], notes: change.notes || [],
     slots: change.slots || [], exceptions: change.exceptions || [], students: change.students || [],
+    settings: change.settings || [],
   };
   await applyChange(entry, true);
   undoStack.push(entry);
@@ -496,9 +499,9 @@ const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
 // 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
 export async function buildBackup(year, month) {
   const [from, to] = year ? monthRange(year, month) : ['0000-01-01', '9999-12-31'];
-  const [lessons, dayNotes, types, durationRules, slots, exceptions, students] = await Promise.all([
+  const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents] = await Promise.all([
     db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
-    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'), db.listStudents(),
+    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'), db.listStudents(), getHiddenStudents(),
   ]);
   const months = year
     ? [`${year}-${String(month).padStart(2, '0')}`]
@@ -508,7 +511,7 @@ export async function buildBackup(year, month) {
     exportedAt: new Date().toISOString(),
     lessons: lessons.map(({ deletedAt, ...l }) => l),
     dayNotes,
-    settings: { types, durationRules },
+    settings: { types, durationRules, hiddenStudents },
     recurring: { slots, exceptions },   // 毎週の固定枠(どの月の書き出しにも全部入れる)
     students,                           // 生徒メモ(どの月の書き出しにも全部入れる)
   };
@@ -603,14 +606,16 @@ export async function restoreBackup(data, { withSettings = false } = {}) {
   if (withSettings && data.settings) {
     if (data.settings.types) await saveTypes(data.settings.types);
     if (data.settings.durationRules) await saveDurationRules(data.settings.durationRules);
+    if (data.settings.hiddenStudents) await db.setSetting('hiddenStudents', data.settings.hiddenStudents);
   }
   return { lessons: data.lessons.length, changed: lessonChanges.length + noteChanges.length };
 }
 
 // 入力したことのある生徒名の一覧(入力欄の候補に出す)
 export async function getStudentNames() {
-  const [fromLessons, slots] = await Promise.all([db.studentNames(), db.listSlots()]);
+  const [fromLessons, slots, hidden] = await Promise.all([db.studentNames(), db.listSlots(), getHiddenStudents()]);
   const names = new Set([...fromLessons, ...slots.map(sl => sl.student)].filter(Boolean));
+  for (const n of hidden) names.delete(n);
   return [...names].sort((a, b) => a.localeCompare(b, 'ja'));
 }
 
@@ -638,7 +643,18 @@ export function setLastInput({ typeId, duration, status }) {
 
 // ---- 生徒メモ ----
 // 生徒:{ id, name, memo, updatedAt }。予定の「名前」と同じ文字の生徒を、同じ人として扱う
-// 一覧には、メモを書いた生徒と、予定・固定枠に名前がある生徒をすべて出す
+// 一覧に出すのは、メモを書いた生徒と、レッスンの予定・固定枠に名前がある生徒
+// (「なし(自分の予定)」と、集計に入れない種類(サウナ・練習・その他など)の予定はレッスンではないので数えない)
+// 「生徒を削除」した名前は一覧と名前の候補から外す(予定はそのまま。設定の hiddenStudents に名前を覚える)
+
+export async function getHiddenStudents() {
+  return (await db.getSetting('hiddenStudents')) || [];
+}
+
+// レッスンとして数える予定・固定枠か
+function isLessonLike(l, typeById) {
+  return (l.status || 'tentative') !== 'none' && !!typeById[l.typeId]?.countInTotal;
+}
 
 // 端末の時計での今日('2026-10-15')
 function localToday() {
@@ -655,18 +671,22 @@ export async function getStudents() {
 export async function getStudentOverview() {
   const today = localToday();
   const from = addDays(today, -180), to = addDays(today, 92);
-  const [students, lessons, occurrences, slots] = await Promise.all([
-    db.listStudents(), db.listLessons(from, to), getOccurrences(today, to), db.listSlots(),
+  const [students, allLessons, occurrences, allSlots, types, hidden] = await Promise.all([
+    db.listStudents(), db.listLessons(from, to), getOccurrences(today, to), db.listSlots(), getTypes(), getHiddenStudents(),
   ]);
+  const typeById = Object.fromEntries(types.map(t => [t.id, t]));
+  const hiddenSet = new Set(hidden);
+  const lessons = allLessons.filter(l => isLessonLike(l, typeById) && !hiddenSet.has(l.student));
+  const slots = allSlots.filter(sl => isLessonLike(sl, typeById) && !hiddenSet.has(sl.student));
   const byName = new Map();
   const entry = name => {
     if (!byName.has(name)) byName.set(name, { name, id: null, memo: '', typeId: null, next: null, slots: [], count: 0, lastDate: '' });
     return byName.get(name);
   };
-  for (const s of students) Object.assign(entry(s.name), { id: s.id, memo: s.memo || '' });
+  for (const s of students) if (!hiddenSet.has(s.name)) Object.assign(entry(s.name), { id: s.id, memo: s.memo || '' });
   const activeSlots = slots.filter(sl => !sl.endDate || sl.endDate >= today);
   for (const sl of activeSlots) if (sl.student) entry(sl.student).slots.push(sl);
-  for (const l of lessons.concat(occurrences)) {
+  for (const l of lessons.concat(occurrences.filter(o => isLessonLike(o, typeById) && !hiddenSet.has(o.student)))) {
     if (!l.student) continue;
     const e = entry(l.student);
     const status = l.status || 'tentative';
@@ -703,14 +723,27 @@ export async function saveStudent({ id, name, memo }) {
   const current = await db.listStudents();
   const before = current.find(s => s.id === id) || current.find(s => s.name === name) || null;
   const after = { id: before?.id || newId(), name, memo: memo || '', updatedAt: new Date().toISOString() };
-  if (before && before.name === after.name && before.memo === after.memo) return after;
-  await commit({ label: `${name}さんの生徒メモ`, students: [{ before, after }] });
+  const hidden = await getHiddenStudents();
+  // 削除した生徒と同じ名前で追加したときは、一覧に戻す
+  const settings = hidden.includes(name) ? [{ key: 'hiddenStudents', before: hidden, after: hidden.filter(n => n !== name) }] : [];
+  if (before && before.name === after.name && before.memo === after.memo && !settings.length) return after;
+  await commit({ label: `${name}さんの生徒メモ`, students: [{ before, after }], settings });
   return after;
 }
 
-export async function deleteStudent(id) {
-  const before = (await db.listStudents()).find(s => s.id === id);
-  if (before) await commit({ label: `${before.name}さんの生徒メモの削除`, students: [{ before, after: null }] });
+// 生徒を削除:一覧と名前の候補から外す。予定・固定枠はそのまま残す
+// 生徒メモは消さずに残す(「削除した生徒」から一覧に戻すと、メモも戻る)
+export async function deleteStudent(name) {
+  const hidden = await getHiddenStudents();
+  if (hidden.includes(name)) return;
+  await commit({ label: `${name}さんの削除`, settings: [{ key: 'hiddenStudents', before: hidden, after: [...hidden, name] }] });
+}
+
+// 削除した生徒を一覧に戻す
+export async function restoreStudent(name) {
+  const hidden = await getHiddenStudents();
+  if (!hidden.includes(name)) return;
+  await commit({ label: `${name}さんを一覧に戻す`, settings: [{ key: 'hiddenStudents', before: hidden, after: hidden.filter(n => n !== name) }] });
 }
 
 // 名前を変える:予定・固定枠・生徒メモの名前をまとめて書き換える(「戻す」で元に戻せる)

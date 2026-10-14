@@ -938,3 +938,6 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
   font-size: 0.9rem;
   white-space: pre-wrap;
 }
+.hidden-students { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.hidden-students summary { min-height: 44px; display: flex; align-items: center; color: var(--muted); cursor: pointer; }
+.hidden-student { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 4px; }

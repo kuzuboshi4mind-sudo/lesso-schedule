@@ -2,6 +2,8 @@
 // ・上の「👤 生徒」から一覧を開く。予定に入れた名前は自動で並ぶ
 // ・タップすると、その生徒のメモ(希望の曜日・時間、注文など)を書ける。固定枠とこれからの予定も見える
 // ・名前を変えると、その生徒の予定・固定枠の名前もまとめて変わる
+// ・「この生徒を削除」で一覧と名前の候補から外す(予定は残る)。一覧の下の「削除した生徒」から戻せる
+// ・「なし(自分の予定)」や集計に入れない種類の予定の名前は、生徒として並べない
 // ・予定の入力画面では、名前の下にその生徒のメモが出る
 import * as store from './store.js';
 import { escapeHtml } from './calendar.js';
@@ -11,6 +13,9 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const listDialog = document.getElementById('students-dialog');
 const list = document.getElementById('students-list');
 const search = document.getElementById('students-search');
+const hiddenBox = document.getElementById('hidden-students');
+const hiddenTitle = document.getElementById('hidden-students-title');
+const hiddenList = document.getElementById('hidden-students-list');
 const dialog = document.getElementById('student-dialog');
 const form = document.getElementById('student-form');
 const f = {
@@ -26,6 +31,7 @@ const f = {
 let onChanged = () => {};
 let overview = [];     // 一覧の中身(store.getStudentOverview の結果)
 let types = [];
+let hidden = [];       // 削除した生徒の名前
 let editing = null;    // 開いている生徒 { name, id, memo, ... }(新しく追加するときは name が空)
 
 export function initStudents(opts) {
@@ -36,6 +42,13 @@ export function initStudents(opts) {
   list.addEventListener('click', e => {
     const row = e.target.closest('[data-name]');
     if (row) openStudent(overview.find(s => s.name === row.dataset.name));
+  });
+  hiddenList.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-restore]');
+    if (!btn) return;
+    await store.restoreStudent(btn.dataset.restore);
+    await loadList();
+    showToast(`${btn.dataset.restore}さんを一覧に戻しました`);
   });
   for (const d of [listDialog, dialog]) {
     d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
@@ -64,8 +77,9 @@ async function openList() {
 }
 
 async function loadList() {
-  [overview, types] = await Promise.all([store.getStudentOverview(), store.getTypes()]);
+  [overview, types, hidden] = await Promise.all([store.getStudentOverview(), store.getTypes(), store.getHiddenStudents()]);
   renderList();
+  renderHidden();
 }
 
 function renderList() {
@@ -94,6 +108,23 @@ function renderList() {
   }).join('');
 }
 
+function renderHidden() {
+  hiddenBox.hidden = !hidden.length;
+  hiddenTitle.textContent = `削除した生徒(${hidden.length}人)`;
+  hiddenList.innerHTML = [...hidden].sort((a, b) => a.localeCompare(b, 'ja')).map(name => `<li class="hidden-student">
+      <span>${escapeHtml(name)}</span>
+      <button type="button" class="btn btn-small" data-restore="${escapeHtml(name)}">一覧に戻す</button>
+    </li>`).join('');
+}
+
+function showToast(text) {
+  const toast = document.getElementById('toast');
+  toast.textContent = text;
+  toast.hidden = false;
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => { toast.hidden = true; }, 3000);
+}
+
 // ---------------------------------------------------------
 // 1人分
 // ---------------------------------------------------------
@@ -105,7 +136,7 @@ async function openStudent(student) {
   f.nameHelp.hidden = isNew;
   f.memo.value = editing.memo;
   f.error.textContent = '';
-  f.del.hidden = !editing.id;
+  f.del.hidden = isNew;
   f.info.innerHTML = isNew ? '' : await infoHtml(editing);
   dialog.showModal();
   if (isNew) f.name.focus(); else f.title.focus();
@@ -149,9 +180,10 @@ async function onSave(e) {
 }
 
 async function onDelete() {
-  if (!confirm(`${editing.name}さんの生徒メモを削除しますか?\n(予定はそのまま残ります。「戻す」で元に戻せます)`)) return;
-  await store.deleteStudent(editing.id);
+  if (!confirm(`${editing.name}さんを生徒の一覧から削除しますか?\n・入っている予定はそのまま残ります\n・名前の候補にも出なくなります\n・一覧の下の「削除した生徒」から戻せます`)) return;
+  await store.deleteStudent(editing.name);
   dialog.close();
   await loadList();
   onChanged();
+  showToast(`${editing.name}さんを削除しました`);
 }
