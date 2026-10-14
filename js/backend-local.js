@@ -94,3 +94,33 @@ export async function getSetting(key) {
 export async function setSetting(key, value) {
   save(KEYS.settings[key] || `lesso.${key}`, value);
 }
+
+// ---- 毎週の固定枠と、その例外(この日だけ休み・変更)----
+// 固定枠:{ id, weekday, start, duration, student, typeId, status, memo, startDate, endDate }
+// 例外:  { id, slotId, date, action:'skip'|'change', lessonId }
+const SLOT_KEY = 'lesso.recurringSlots';
+const EXC_KEY = 'lesso.recurringExceptions';
+
+export async function listSlots() {
+  return load(SLOT_KEY, []);
+}
+
+export async function writeSlots(states) {
+  const byId = new Map(load(SLOT_KEY, []).map(s => [s.id, s]));
+  for (const { id, slot } of states) {
+    if (slot) byId.set(id, slot); else byId.delete(id);
+  }
+  save(SLOT_KEY, [...byId.values()]);
+}
+
+export async function listExceptions(from, to) {
+  return load(EXC_KEY, []).filter(x => x.date >= from && x.date <= to);
+}
+
+export async function writeExceptions(states) {
+  const byId = new Map(load(EXC_KEY, []).map(x => [x.id, x]));
+  for (const { id, exception } of states) {
+    if (exception) byId.set(id, exception); else byId.delete(id);
+  }
+  save(EXC_KEY, [...byId.values()]);
+}

@@ -31,6 +31,11 @@ const f = {
   types: document.getElementById('lesson-types'),
   memo: document.getElementById('lesson-memo'),
   error: document.getElementById('lesson-error'),
+  recurringInfo: document.getElementById('lesson-recurring-info'),
+  repeatField: document.getElementById('repeat-field'),
+  repeat: document.getElementById('lesson-repeat'),
+  repeatEndField: document.getElementById('repeat-end-field'),
+  repeatEnd: document.getElementById('lesson-repeat-end'),
   del: document.getElementById('lesson-delete'),
 };
 
@@ -78,6 +83,27 @@ f.durations.addEventListener('change', () => {
 });
 f.start.addEventListener('change', () => renderEndOptions(Number(f.end.value)));
 f.end.addEventListener('change', updateEndLength);
+
+// 「毎週くり返す」をオンにしたときだけ終了日の欄を出す
+f.repeat.addEventListener('change', () => { f.repeatEndField.hidden = !f.repeat.checked; });
+
+// 固定枠の予定を変える・消すとき「この日だけ / この日以降」を選ぶ。選んだ value を返す(やめたら null)
+const scopeDialog = document.getElementById('scope-dialog');
+function askScope(title, text, options) {
+  document.getElementById('scope-title').textContent = title;
+  document.getElementById('scope-text').textContent = text;
+  const box = document.getElementById('scope-buttons');
+  box.innerHTML = options.map(o =>
+    `<button type="button" class="btn ${o.danger ? 'btn-danger' : 'btn-primary'}" data-value="${o.value}">${o.label}</button>`).join('');
+  scopeDialog.showModal();
+  scopeDialog.querySelector('h2').focus();
+  return new Promise(resolve => {
+    const done = value => { scopeDialog.close(); resolve(value); };
+    box.onclick = e => { const b = e.target.closest('[data-value]'); if (b) done(b.dataset.value); };
+    scopeDialog.querySelector('[data-close]').onclick = () => done(null);
+    scopeDialog.oncancel = () => resolve(null);
+  });
+}
 
 // 仮・確約・キャンセルのボタンを並べる
 for (const st of store.STATUSES) {
@@ -155,6 +181,15 @@ async function openLesson(lesson) {
   if (!form.querySelector('input[name="typeId"]:checked')) form.querySelector('input[name="typeId"]').checked = true;
   f.error.textContent = '';
   f.del.hidden = !lesson.id;
+  // 固定枠から入った予定なら説明を出し、「くり返し」の欄はかくす
+  const occ = store.isOccurrenceId(lesson.id);
+  f.recurringInfo.hidden = !occ;
+  f.recurringInfo.textContent = occ ? `↻ ${store.slotLabel(lesson.slot)} の固定枠から入った予定です` : '';
+  f.repeatField.hidden = occ;
+  f.repeat.checked = false;
+  f.repeatEnd.value = '';
+  f.repeatEndField.hidden = true;
+  f.del.textContent = occ ? 'この日を休みにする・固定枠を終える…' : 'この予定を削除';
   dialog.showModal();
   // 題名の部分を選んだ状態で開く(日付の欄が選ばれて、カレンダーが勝手に開かないように)
   f.title.focus();
@@ -173,16 +208,23 @@ form.addEventListener('submit', async e => {
   if (!(duration > 0)) { f.error.textContent = picked === 'end' ? '終了時刻を開始より後にしてください' : '長さを選んでください'; return; }
   if (toMinutes(start) + duration > DAY_END) { f.error.textContent = '24:00 を過ぎてしまいます。開始時刻か長さを変えてください'; return; }
 
-  await store.saveLesson({
-    ...editing,
-    date,
-    start,
-    duration,
-    typeId,
-    status,
-    student: f.student.value.trim(),
-    memo: f.memo.value.trim(),
-  });
+  const values = { ...editing, date, start, duration, typeId, status, student: f.student.value.trim(), memo: f.memo.value.trim() };
+  if (store.isOccurrenceId(editing.id)) {
+    // 固定枠の予定:この日だけ変えるか、この日以降の固定枠を変えるか
+    const scope = await askScope('固定枠の予定を変更', `${store.slotLabel(editing.slot)} の固定枠です。どちらを変えますか?`, [
+      { value: 'this', label: 'この日だけ変更' },
+      { value: 'from', label: 'この日以降をすべて変更' },
+    ]);
+    if (!scope) return;
+    if (scope === 'this') await store.saveLesson(values);
+    else await store.changeSlotFrom(editing.id, values);
+  } else if (f.repeat.checked) {
+    // 毎週くり返す:固定枠として登録する
+    if (f.repeatEnd.value && f.repeatEnd.value < date) { f.error.textContent = '終了日は、この予定の日付より後にしてください'; return; }
+    await store.addSlot(values, f.repeatEnd.value || null);
+  } else {
+    await store.saveLesson(values);
+  }
   // 次に入れるときの初期値(長い予定は30分に戻す)
   store.setLastInput({ typeId, duration: durations.includes(duration) ? duration : 30, status });
   dialog.close();
@@ -191,6 +233,18 @@ form.addEventListener('submit', async e => {
 
 f.del.addEventListener('click', async () => {
   if (!editing?.id) return;
+  if (store.isOccurrenceId(editing.id)) {
+    const scope = await askScope('固定枠の予定を消す', `${store.slotLabel(editing.slot)} の固定枠です。どうしますか?`, [
+      { value: 'skip', label: 'この日だけ休みにする' },
+      { value: 'end', label: 'この日以降の固定枠を終える', danger: true },
+    ]);
+    if (!scope) return;
+    if (scope === 'skip') await store.skipOccurrence(editing.id);
+    else await store.endSlotFrom(editing.id);
+    dialog.close();
+    onChanged();
+    return;
+  }
   if (!confirm(`「${editing.student || '(名前なし)'}」の予定を削除しますか?\n(ゴミ箱に入ります。30日間は元に戻せます)`)) return;
   await store.deleteLesson(editing.id);
   dialog.close();

@@ -102,3 +102,47 @@ export async function getSetting(key) {
 export async function setSetting(key, value) {
   check(await supabase.from('user_settings').upsert({ key, value }, { onConflict: 'user_id,key' }));
 }
+
+// ---- 毎週の固定枠と、その例外(この日だけ休み・変更)----
+function slotFromRow(r) {
+  return {
+    id: r.id, weekday: r.weekday, start: r.start, duration: r.duration, student: r.student,
+    typeId: r.type_id, status: r.status, memo: r.memo, startDate: r.start_date, endDate: r.end_date || null,
+  };
+}
+
+function slotToRow(s) {
+  return {
+    id: s.id, weekday: s.weekday, start: s.start, duration: s.duration, student: s.student || '',
+    type_id: s.typeId || '', status: s.status || 'confirmed', memo: s.memo || '',
+    start_date: s.startDate, end_date: s.endDate || null,
+  };
+}
+
+export async function listSlots() {
+  const rows = check(await supabase.from('recurring_slots')
+    .select('id,weekday,start,duration,student,type_id,status,memo,start_date,end_date'));
+  return rows.map(slotFromRow);
+}
+
+export async function writeSlots(states) {
+  const upserts = states.filter(s => s.slot).map(s => slotToRow(s.slot));
+  const deletes = states.filter(s => !s.slot).map(s => s.id);
+  if (upserts.length) check(await supabase.from('recurring_slots').upsert(upserts));
+  if (deletes.length) check(await supabase.from('recurring_slots').delete().in('id', deletes));
+}
+
+export async function listExceptions(from, to) {
+  const rows = check(await supabase.from('recurring_exceptions').select('id,slot_id,date,action,lesson')
+    .gte('date', from).lte('date', to));
+  return rows.map(r => ({ id: r.id, slotId: r.slot_id, date: r.date, action: r.action, lessonId: r.lesson?.lessonId || null }));
+}
+
+export async function writeExceptions(states) {
+  const upserts = states.filter(s => s.exception).map(({ exception: x }) => ({
+    id: x.id, slot_id: x.slotId, date: x.date, action: x.action, lesson: x.lessonId ? { lessonId: x.lessonId } : null,
+  }));
+  const deletes = states.filter(s => !s.exception).map(s => s.id);
+  if (deletes.length) check(await supabase.from('recurring_exceptions').delete().in('id', deletes));
+  if (upserts.length) check(await supabase.from('recurring_exceptions').upsert(upserts, { onConflict: 'slot_id,date' }));
+}

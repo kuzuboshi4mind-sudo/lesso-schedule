@@ -112,6 +112,7 @@ function lessonBlock(lesson, type, pos) {
   const status = lesson.status || 'tentative';
   const width = 100 / pos.lanes;
   const memoMark = lesson.memo ? '<span class="lesson-memo-mark">✎</span>' : '';
+  const repeatMark = lesson.recurring ? '<span class="lesson-repeat-mark" title="毎週の固定枠">↻</span>' : '';
   // 長さの表示:30分は省略、2時間を超える予定は終了時刻
   const end = fromMinutes(toMinutes(lesson.start) + lesson.duration);
   const durationLabel = lesson.duration > 120 ? `<span class="lesson-dur">〜${end}</span>`
@@ -126,7 +127,7 @@ function lessonBlock(lesson, type, pos) {
   return `<button type="button" class="lesson ${status}${lesson.duration <= 20 ? ' short' : ''}" data-id="${escapeHtml(lesson.id)}"
     title="${escapeHtml(tip)}"
     style="--offset:${offset};--dur:${lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
-    <span class="lesson-name">${label}</span>${durationLabel}${memoMark}
+    <span class="lesson-name">${label}</span>${durationLabel}${memoMark}${repeatMark}
   </button>`;
 }
 

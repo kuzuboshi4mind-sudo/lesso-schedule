@@ -785,3 +785,57 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .trash-main span { color: var(--text); font-size: 0.95rem; }
 .trash-main small { color: var(--muted); }
 .trash-empty { padding: 24px 0; text-align: center; color: var(--muted); }
+
+/* =========================================================
+   毎週の固定枠
+   ========================================================= */
+.lesson-repeat-mark {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  font-size: 0.75em;
+  opacity: 0.8;
+}
+.recurring-info {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--head);
+  color: var(--accent);
+  font-weight: 700;
+}
+.recurring-info[hidden] { display: none; }
+#repeat-field[hidden] { display: none; }
+.scope-buttons { display: flex; flex-direction: column; gap: 10px; }
+.scope-buttons .btn { min-height: 50px; justify-content: center; }
+.slot-list { margin: 0 0 12px; padding: 0; list-style: none; }
+.slot-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.slot-main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.slot-swatch { width: 16px; height: 16px; border-radius: 4px; }
+.slot-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.9rem; color: var(--muted); }
+.slot-dates input, .skip-range input {
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.slot-ended { color: var(--danger); }
+.slot-skips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.9rem; color: var(--muted); }
+.skip-chip {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--head);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.slot-empty { padding: 8px 0; color: var(--muted); font-size: 0.9rem; }
+.skip-range { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--head); }
+.skip-range label { display: inline-flex; align-items: center; gap: 6px; }

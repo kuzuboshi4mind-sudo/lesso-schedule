@@ -7,6 +7,7 @@ import { initSettings } from './settings.js';
 import { initZoom, refreshZoom } from './zoom.js';
 import { requireLogin, watchLogout, logout } from './login.js';
 import { initTrashBackup, showLastBackup } from './trash-backup.js';
+import { initRecurring } from './recurring.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -105,6 +106,7 @@ initSettings({ onChanged: () => show({ keepScroll: true }) });
 initZoom({ table, scroller });
 initTrashBackup({ getMonth: () => current, onChanged: () => show({ keepScroll: true }) });
 document.getElementById('open-settings').addEventListener('click', showLastBackup);
+initRecurring({ onChanged: () => show({ keepScroll: true }) });
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)
 window.addEventListener('unhandledrejection', e => {

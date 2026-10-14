@@ -149,7 +149,7 @@ async function importBackup() {
     + 'この月の今の予定と「予定」の行は、バックアップの内容に置き換わります。\n'
     + '(今だけある予定はゴミ箱に入ります。読み込んだあと「戻す」で元に戻すこともできます)');
   if (!ok) return;
-  const withSettings = !!data.settings && confirm('種類と色・換算表の設定も、バックアップの内容に戻しますか?\n(「キャンセル」なら今の設定のままにします)');
+  const withSettings = !!data.settings && confirm('種類と色・換算表・毎週の固定枠も、バックアップの内容に戻しますか?\n(「キャンセル」なら今のままにします)');
   const result = await store.restoreBackup(data, { withSettings });
   onChanged();
   showMessage(`バックアップを読み込みました(予定${result.lessons}件)`);

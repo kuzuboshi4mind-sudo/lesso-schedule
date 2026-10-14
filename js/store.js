@@ -111,11 +111,15 @@ function monthRange(year, month) {
 }
 
 // その月のレッスンをすべて返す(month は 1〜12)
+// 毎週の固定枠から自動で入る予定(id が 'rec:' で始まる)も含む
 export async function getLessons(year, month) {
-  return db.listLessons(...monthRange(year, month));
+  const [from, to] = monthRange(year, month);
+  const [lessons, occurrences] = await Promise.all([db.listLessons(from, to), getOccurrences(from, to)]);
+  return lessons.concat(occurrences);
 }
 
 export async function getLesson(id) {
+  if (isOccurrenceId(id)) return getOccurrence(id);
   return (await db.getLessonsByIds([id]))[0] || null;
 }
 
@@ -128,18 +132,28 @@ const undoStack = [];
 const redoStack = [];
 
 // 変更前か変更後のどちらかの状態を書き込む(useAfter=true で変更後)
+// 固定枠 → 例外 → 予定 → メモ の順に書く(例外は固定枠があってから書く必要があるため)
 async function applyChange(entry, useAfter) {
-  const lessonStates = entry.lessons.map(c => ({ id: (c.after || c.before).id, lesson: useAfter ? c.after : c.before }));
-  const noteStates = entry.notes.map(c => ({ date: c.date, text: useAfter ? c.after : c.before }));
+  const pick = c => (useAfter ? c.after : c.before);
+  const slotStates = entry.slots.map(c => ({ id: (c.after || c.before).id, slot: pick(c) }));
+  const excStates = entry.exceptions.map(c => ({ id: (c.after || c.before).id, exception: pick(c) }));
+  const lessonStates = entry.lessons.map(c => ({ id: (c.after || c.before).id, lesson: pick(c) }));
+  const noteStates = entry.notes.map(c => ({ date: c.date, text: pick(c) }));
+  if (slotStates.length) await db.writeSlots(slotStates);
+  if (excStates.length) await db.writeExceptions(excStates);
   if (lessonStates.length) await db.writeLessons(lessonStates);
   if (noteStates.length) await db.writeNotes(noteStates);
 }
 
 // 変更を書き込んで記録する。label は「元に戻しました:〇〇」の表示に使う
-// change = { label, lessons:[{ before, after }], notes:[{ date, before, after }] }
+// change = { label, lessons:[{ before, after }], notes:[{ date, before, after }],
+//            slots:[{ before, after }], exceptions:[{ before, after }] }
 // 書き込みに失敗したときは記録しない(エラーはそのまま呼んだ側に伝える)
 async function commit(change) {
-  const entry = { label: change.label, lessons: change.lessons || [], notes: change.notes || [] };
+  const entry = {
+    label: change.label, lessons: change.lessons || [], notes: change.notes || [],
+    slots: change.slots || [], exceptions: change.exceptions || [],
+  };
   await applyChange(entry, true);
   undoStack.push(entry);
   if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
@@ -179,22 +193,32 @@ export async function addLessons(lessons, label = '追加') {
 }
 
 // まとめて削除する(ゴミ箱に入れる。30日間は「ゴミ箱」から元に戻せる)
+// 固定枠から入った予定は、その日だけ「休み」にする
 export async function deleteLessons(ids, label = '削除') {
-  const targets = (await db.getLessonsByIds(ids)).filter(t => !t.deletedAt);
+  const realIds = ids.filter(id => !isOccurrenceId(id));
+  const occIds = ids.filter(isOccurrenceId);
+  const targets = (await db.getLessonsByIds(realIds)).filter(t => !t.deletedAt);
   const now = new Date().toISOString();
-  await commit({ label: `${label}(${targets.length}件)`, lessons: targets.map(t => ({ before: t, after: { ...t, deletedAt: now } })) });
+  await commit({
+    label: `${label}(${targets.length + occIds.length}件)`,
+    lessons: targets.map(t => ({ before: t, after: { ...t, deletedAt: now } })),
+    exceptions: occIds.map(id => ({ before: null, after: newException(parseOccurrenceId(id), 'skip') })),
+  });
 }
 
 // 新規(id なし)なら追加、id ありなら上書き
+// 固定枠から入った予定(id が 'rec:')を保存すると、「この日だけ変更」になる
 export async function saveLesson(lesson) {
+  if (isOccurrenceId(lesson.id)) return changeOccurrence(lesson.id, lesson);
   const before = lesson.id ? await getLesson(lesson.id) : null;
   const after = lesson.id ? lesson : { ...lesson, id: newId() };
   await commit({ label: `${before ? '変更' : '追加'}:${nameOf(after)}`, lessons: [{ before, after }] });
   return after;
 }
 
-// 1件削除する(ゴミ箱に入れる)
+// 1件削除する(ゴミ箱に入れる。固定枠の予定は、その日だけ休みにする)
 export async function deleteLesson(id) {
+  if (isOccurrenceId(id)) return skipOccurrence(id);
   const before = await getLesson(id);
   if (before && !before.deletedAt) {
     await commit({ label: `削除:${nameOf(before)}`, lessons: [{ before, after: { ...before, deletedAt: new Date().toISOString() } }] });
@@ -225,6 +249,188 @@ export async function purgeOldTrash() {
   await db.purgeTrash(before);
 }
 
+// ---- 毎週の固定枠 ----
+// 固定枠:{ id, weekday(0=日曜), start, duration, student, typeId, status, memo, startDate, endDate }
+// 固定枠から入る毎週の予定は、データベースには保存せず、表示するたびに作る(id は 'rec:固定枠id:日付')。
+// その日だけ休み・変更にした日は「例外」{ id, slotId, date, action:'skip'|'change', lessonId } として保存する。
+// 「この日だけ変更」は、その日の分をふつうの予定として保存し、固定枠のほうは例外で隠す。
+
+const OCC_PREFIX = 'rec:';
+
+export function isOccurrenceId(id) {
+  return typeof id === 'string' && id.startsWith(OCC_PREFIX);
+}
+
+function occurrenceId(slotId, date) {
+  return `${OCC_PREFIX}${slotId}:${date}`;
+}
+
+function parseOccurrenceId(id) {
+  const [, slotId, date] = id.split(':');
+  return { slotId, date };
+}
+
+function newException({ slotId, date }, action, lessonId = null) {
+  return { id: newId(), slotId, date, action, lessonId };
+}
+
+function addDays(date, n) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+function weekdayOf(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
+function slotActiveOn(slot, date) {
+  return slot.weekday === weekdayOf(date) && slot.startDate <= date && (!slot.endDate || date <= slot.endDate);
+}
+
+function occurrenceOf(slot, date) {
+  const { id, weekday, startDate, endDate, ...rest } = slot;
+  return { ...rest, id: occurrenceId(slot.id, date), date, recurring: { slotId: slot.id, date } };
+}
+
+// from〜to の間に固定枠から入る予定(休み・変更にした日は除く)
+async function getOccurrences(from, to) {
+  const [slots, exceptions] = await Promise.all([db.listSlots(), db.listExceptions(from, to)]);
+  if (!slots.length) return [];
+  const hidden = new Set(exceptions.map(x => `${x.slotId}|${x.date}`));
+  const out = [];
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    for (const slot of slots) {
+      if (slotActiveOn(slot, date) && !hidden.has(`${slot.id}|${date}`)) out.push(occurrenceOf(slot, date));
+    }
+  }
+  return out;
+}
+
+async function getOccurrence(id) {
+  const { slotId, date } = parseOccurrenceId(id);
+  const slot = (await db.listSlots()).find(s => s.id === slotId);
+  return slot ? { ...occurrenceOf(slot, date), slot } : null;
+}
+
+const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+
+// 「毎週水曜 15:00」のような説明
+export function slotLabel(slot) {
+  return `毎週${WEEKDAY_NAMES[slot.weekday]}曜 ${slot.start}`;
+}
+
+// 固定枠の一覧(曜日・時刻の順)
+export async function getSlots() {
+  return (await db.listSlots()).sort((a, b) => a.weekday - b.weekday || toMin(a.start) - toMin(b.start));
+}
+
+function toMin(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// 予定の内容から固定枠を作る(その日の曜日に毎週。endDate は省略可)
+export async function addSlot(lesson, endDate = null) {
+  const slot = {
+    id: newId(), weekday: weekdayOf(lesson.date), start: lesson.start, duration: lesson.duration,
+    student: lesson.student || '', typeId: lesson.typeId, status: lesson.status || 'confirmed', memo: lesson.memo || '',
+    startDate: lesson.date, endDate: endDate || null,
+  };
+  // ふつうの予定から固定枠にしたときは、元の予定はゴミ箱へ(同じ日に二重に出ないように)
+  const original = lesson.id && !isOccurrenceId(lesson.id) ? await getLesson(lesson.id) : null;
+  await commit({
+    label: `固定枠を追加:${slotLabel(slot)} ${nameOf(slot)}`,
+    slots: [{ before: null, after: slot }],
+    lessons: original ? [{ before: original, after: { ...original, deletedAt: new Date().toISOString() } }] : [],
+  });
+  return slot;
+}
+
+// この日だけ休み
+export async function skipOccurrence(id) {
+  const occ = parseOccurrenceId(id);
+  await commit({ label: `この日だけ休み:${occ.date}`, exceptions: [{ before: null, after: newException(occ, 'skip') }] });
+}
+
+// この日だけ変更(その日の分をふつうの予定として保存)
+async function changeOccurrence(id, values) {
+  const occ = parseOccurrenceId(id);
+  const { recurring, slot, ...rest } = values;
+  const lesson = { ...rest, id: newId(), deletedAt: null };
+  await commit({
+    label: `この日だけ変更:${nameOf(lesson)}`,
+    lessons: [{ before: null, after: lesson }],
+    exceptions: [{ before: null, after: newException(occ, 'change', lesson.id) }],
+  });
+  return lesson;
+}
+
+// この日以降の固定枠を、新しい内容に変える(前日までは元の内容のまま)
+export async function changeSlotFrom(id, values) {
+  const { slotId, date } = parseOccurrenceId(id);
+  const old = (await db.listSlots()).find(s => s.id === slotId);
+  if (!old) return;
+  const next = {
+    ...old, id: newId(), weekday: weekdayOf(values.date), start: values.start, duration: values.duration,
+    student: values.student || '', typeId: values.typeId, status: values.status, memo: values.memo || '',
+    startDate: values.date,
+  };
+  const slots = old.startDate >= date
+    ? [{ before: old, after: { ...next, id: old.id } }]                                   // 初回から変えるなら、そのまま書き換え
+    : [{ before: old, after: { ...old, endDate: addDays(date, -1) } }, { before: null, after: next }];
+  await commit({ label: `固定枠を変更:${slotLabel(next)} ${nameOf(next)}`, slots });
+}
+
+// この日以降の固定枠を終わりにする(初回より前なら固定枠ごと削除)
+export async function endSlotFrom(id) {
+  const { slotId, date } = parseOccurrenceId(id);
+  const slot = (await db.listSlots()).find(s => s.id === slotId);
+  if (!slot) return;
+  if (slot.startDate >= date) return deleteSlot(slotId);
+  await commit({ label: `固定枠を終了:${slotLabel(slot)} ${nameOf(slot)}`, slots: [{ before: slot, after: { ...slot, endDate: addDays(date, -1) } }] });
+}
+
+// 固定枠の内容を書き換える(設定画面の一覧から。終了日の変更など)
+export async function updateSlot(slot) {
+  const before = (await db.listSlots()).find(s => s.id === slot.id);
+  await commit({ label: `固定枠を変更:${slotLabel(slot)} ${nameOf(slot)}`, slots: [{ before, after: slot }] });
+}
+
+// 固定枠を削除(その例外も一緒に)
+export async function deleteSlot(slotId) {
+  const slot = (await db.listSlots()).find(s => s.id === slotId);
+  if (!slot) return;
+  const exceptions = (await db.listExceptions('0000-01-01', '9999-12-31')).filter(x => x.slotId === slotId);
+  await commit({
+    label: `固定枠を削除:${slotLabel(slot)} ${nameOf(slot)}`,
+    slots: [{ before: slot, after: null }],
+    exceptions: exceptions.map(x => ({ before: x, after: null })),
+  });
+}
+
+// 固定枠ごとの「休みにした日」
+export async function getSkips(slotId) {
+  return (await db.listExceptions('0000-01-01', '9999-12-31'))
+    .filter(x => x.slotId === slotId && x.action === 'skip').sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// 休みにした日を元に戻す(固定枠の予定がまた入る)
+export async function unskip(exception) {
+  await commit({ label: `休みを取り消し:${exception.date}`, exceptions: [{ before: exception, after: null }] });
+}
+
+// from〜to の期間、すべての固定枠を休みにする(夏休みなど)。休みにした件数を返す
+export async function skipRange(from, to) {
+  const occurrences = await getOccurrences(from, to);
+  if (!occurrences.length) return 0;
+  await commit({
+    label: `期間を休みに:${from}〜${to}`,
+    exceptions: occurrences.map(o => ({ before: null, after: newException(o.recurring, 'skip') })),
+  });
+  return occurrences.length;
+}
+
 // ---- バックアップ(ファイルへの書き出し・読み込み)----
 const BACKUP_APP = 'lesso-schedule';
 const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
@@ -233,8 +439,9 @@ const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
 // 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
 export async function buildBackup(year, month) {
   const [from, to] = year ? monthRange(year, month) : ['0000-01-01', '9999-12-31'];
-  const [lessons, dayNotes, types, durationRules] = await Promise.all([
+  const [lessons, dayNotes, types, durationRules, slots, exceptions] = await Promise.all([
     db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
+    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'),
   ]);
   const months = year
     ? [`${year}-${String(month).padStart(2, '0')}`]
@@ -245,6 +452,7 @@ export async function buildBackup(year, month) {
     lessons: lessons.map(({ deletedAt, ...l }) => l),
     dayNotes,
     settings: { types, durationRules },
+    recurring: { slots, exceptions },   // 毎週の固定枠(どの月の書き出しにも全部入れる)
   };
 }
 
@@ -305,7 +513,23 @@ export async function restoreBackup(data, { withSettings = false } = {}) {
     // 新しい予定・ゴミ箱に入っている予定・中身が違う予定だけを書き戻す
     if (!before || before.deletedAt || !sameLesson(before, after)) lessonChanges.push({ before, after });
   }
-  await commit({ label: `バックアップの読み込み(${data.months.join('・')})`, lessons: lessonChanges, notes: noteChanges });
+  // 「設定も戻す」を選んだときは、毎週の固定枠もファイルの内容にそろえる
+  const slotChanges = [], excChanges = [];
+  if (withSettings && data.recurring) {
+    const [curSlots, curExc] = await Promise.all([db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31')]);
+    const sync = (current, wanted, out) => {
+      const wantedIds = new Set(wanted.map(x => x.id));
+      const byId = new Map(current.map(x => [x.id, x]));
+      for (const x of current) if (!wantedIds.has(x.id)) out.push({ before: x, after: null });
+      for (const x of wanted) out.push({ before: byId.get(x.id) || null, after: x });
+    };
+    sync(curSlots, data.recurring.slots || [], slotChanges);
+    sync(curExc, data.recurring.exceptions || [], excChanges);
+  }
+  await commit({
+    label: `バックアップの読み込み(${data.months.join('・')})`,
+    lessons: lessonChanges, notes: noteChanges, slots: slotChanges, exceptions: excChanges,
+  });
   if (withSettings && data.settings) {
     if (data.settings.types) await saveTypes(data.settings.types);
     if (data.settings.durationRules) await saveDurationRules(data.settings.durationRules);
@@ -315,7 +539,8 @@ export async function restoreBackup(data, { withSettings = false } = {}) {
 
 // 入力したことのある生徒名の一覧(入力欄の候補に出す)
 export async function getStudentNames() {
-  const names = new Set((await db.studentNames()).filter(Boolean));
+  const [fromLessons, slots] = await Promise.all([db.studentNames(), db.listSlots()]);
+  const names = new Set([...fromLessons, ...slots.map(sl => sl.student)].filter(Boolean));
   return [...names].sort((a, b) => a.localeCompare(b, 'ja'));
 }
 

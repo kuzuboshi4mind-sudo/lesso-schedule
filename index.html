@@ -109,6 +109,8 @@
         <button type="submit" class="btn btn-primary">保存</button>
       </div>
       <p id="lesson-error" class="form-error" role="alert"></p>
+      <!-- 固定枠から入った予定のときだけ出る説明 -->
+      <p id="lesson-recurring-info" class="recurring-info" hidden></p>
 
       <div class="field-row">
         <label class="field">
@@ -149,6 +151,19 @@
         <div id="lesson-types" class="chips"></div>
       </fieldset>
 
+      <fieldset class="field" id="repeat-field">
+        <legend class="field-label">くり返し</legend>
+        <label class="toggle">
+          <input type="checkbox" id="lesson-repeat">
+          <span>毎週この曜日・この時間にくり返す(固定枠)</span>
+        </label>
+        <label id="repeat-end-field" class="end-field" hidden>
+          <span>終了日</span>
+          <input type="date" id="lesson-repeat-end">
+          <span class="end-length">(空のままなら、ずっと続く)</span>
+        </label>
+      </fieldset>
+
       <label class="field">
         <span class="field-label">メモ</span>
         <textarea id="lesson-memo" rows="2" placeholder="例:発表会の曲を練習"></textarea>
@@ -172,6 +187,20 @@
       <h3>保存先とアカウント</h3>
       <p id="account-info" class="sheet-note"></p>
       <button type="button" id="logout" class="btn" hidden>ログアウト</button>
+    </section>
+
+    <section class="settings-section">
+      <h3>毎週の固定枠</h3>
+      <p class="sheet-note">予定の入力画面で「毎週この曜日・この時間にくり返す」にチェックすると、ここに並びます。表では ↻ の印が付きます。</p>
+      <ul id="slot-list" class="slot-list"></ul>
+      <div class="skip-range">
+        <strong>期間をまとめて休みにする(夏休みなど)</strong>
+        <div class="button-row">
+          <label><input type="date" id="skip-from"> から</label>
+          <label><input type="date" id="skip-to"> まで</label>
+          <button type="button" id="skip-range-btn" class="btn">この期間の固定枠を休みにする</button>
+        </div>
+      </div>
     </section>
 
     <section class="settings-section">
@@ -231,6 +260,16 @@
       <button type="button" id="save-share" class="btn" hidden>共有…(「ファイルに保存」など)</button>
     </div>
     <p class="sheet-note">iPad・iPhone では「ファイル」アプリの「ダウンロード」に保存されます。</p>
+  </dialog>
+
+  <!-- 固定枠の予定を変える・消すときに「この日だけ / この日以降」を選ぶ画面 -->
+  <dialog id="scope-dialog" class="sheet sheet-small">
+    <div class="sheet-head">
+      <h2 id="scope-title" tabindex="-1"></h2>
+      <button type="button" class="btn" data-close>やめる</button>
+    </div>
+    <p id="scope-text" class="sheet-note"></p>
+    <div id="scope-buttons" class="scope-buttons"></div>
   </dialog>
 
   <!-- 日ごとのメモ(「予定」の行)の入力画面 -->
