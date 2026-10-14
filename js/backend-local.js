@@ -124,3 +124,25 @@ export async function writeExceptions(states) {
   }
   save(EXC_KEY, [...byId.values()]);
 }
+
+// ---- 生徒メモ ----
+// { id, name, memo, updatedAt }
+const STUDENT_KEY = 'lesso.students';
+
+export async function listStudents() {
+  return load(STUDENT_KEY, []);
+}
+
+// states:[{ id, student }](student が null なら削除)
+export async function writeStudents(states) {
+  const byId = new Map(load(STUDENT_KEY, []).map(s => [s.id, s]));
+  for (const { id, student } of states) {
+    if (student) byId.set(id, student); else byId.delete(id);
+  }
+  save(STUDENT_KEY, [...byId.values()]);
+}
+
+// その生徒名の予定(ゴミ箱のものは除く)
+export async function lessonsOfStudent(name) {
+  return alive().filter(l => l.student === name);
+}

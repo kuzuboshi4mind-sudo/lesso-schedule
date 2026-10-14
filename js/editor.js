@@ -23,6 +23,7 @@ const f = {
   start: document.getElementById('lesson-start'),
   student: document.getElementById('lesson-student'),
   suggest: document.getElementById('student-suggest'),
+  studentMemo: document.getElementById('lesson-student-memo'),
   durations: document.getElementById('lesson-durations'),
   endField: document.getElementById('lesson-end-field'),
   end: document.getElementById('lesson-end'),
@@ -42,6 +43,7 @@ const f = {
 let editing = null;   // 編集中のレッスン(新規なら id なし)
 let onChanged = () => {};
 let studentNames = []; // 前に入れた名前(候補用)
+let studentMemos = []; // 生徒メモ(名前の下に出す用)
 
 // 6:00〜23:45 を15分刻みで選べるようにする
 for (let m = START_HOUR * 60; m < DAY_END; m += 15) {
@@ -132,7 +134,14 @@ async function renderTypeChips() {
 
 // 名前の候補。ブラウザの候補表示(datalist)は iPad で入力のじゃまになるため、自前で出す
 async function loadStudentNames() {
-  studentNames = await store.getStudentNames();
+  [studentNames, studentMemos] = await Promise.all([store.getStudentNames(), store.getStudents()]);
+}
+
+// 名前の欄の生徒に生徒メモがあれば、名前の下に出す
+function renderStudentMemo() {
+  const memo = studentMemos.find(s => s.name === f.student.value.trim())?.memo;
+  f.studentMemo.hidden = !memo;
+  f.studentMemo.textContent = memo ? `📝 ${memo}` : '';
 }
 
 function renderSuggest() {
@@ -143,6 +152,7 @@ function renderSuggest() {
 }
 
 f.student.addEventListener('input', renderSuggest);
+f.student.addEventListener('input', renderStudentMemo);
 f.student.addEventListener('focus', renderSuggest);
 f.student.addEventListener('blur', () => setTimeout(() => { f.suggest.hidden = true; }, 200));
 // 候補をタップしたら名前の欄に入れる(押した瞬間に入力欄から離れないよう pointerdown で止める)
@@ -152,6 +162,7 @@ f.suggest.addEventListener('click', e => {
   if (!item) return;
   f.student.value = item.textContent;
   f.suggest.hidden = true;
+  renderStudentMemo();
 });
 
 function check(name, value) {
@@ -178,6 +189,7 @@ async function openLesson(lesson) {
   f.date.value = lesson.date;
   f.start.value = lesson.start;
   f.student.value = lesson.student;
+  renderStudentMemo();
   f.memo.value = lesson.memo || '';
   form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
   // 長さが選択肢にないとき(長い予定など)は「終了時刻で指定」にする

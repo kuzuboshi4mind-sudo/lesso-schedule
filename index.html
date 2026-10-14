@@ -48,6 +48,7 @@
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
       <button type="button" id="next-month" class="btn" aria-label="次の月">次月 ▶</button>
       <button type="button" id="zoom-fit" class="btn zoom-btn" aria-pressed="false" title="2本指でつまむ・広げるでも拡大・縮小できます">1か月表示</button>
+      <button type="button" id="open-students" class="btn" aria-label="生徒メモ">👤 生徒</button>
       <button type="button" id="open-settings" class="btn" aria-label="設定">⚙ 設定</button>
     </nav>
     <div class="legends">
@@ -132,6 +133,8 @@
         <input type="text" id="lesson-student" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="例:山田 / 練習">
         <!-- 前に入れた名前の候補(タップで入る) -->
         <div id="student-suggest" class="suggest" hidden></div>
+        <!-- その生徒の生徒メモ(あるときだけ出る) -->
+        <p id="lesson-student-memo" class="student-memo-hint" hidden></p>
       </div>
 
       <fieldset class="field">
@@ -272,6 +275,45 @@
       <button type="button" class="btn btn-primary" data-close>閉じる</button>
     </div>
     <div id="summary-body"></div>
+  </dialog>
+
+  <!-- 生徒メモの一覧 -->
+  <dialog id="students-dialog" class="sheet">
+    <div class="sheet-head">
+      <h2 tabindex="-1">生徒メモ</h2>
+      <button type="button" class="btn btn-primary" data-close>閉じる</button>
+    </div>
+    <div class="students-tools">
+      <input type="search" id="students-search" placeholder="名前でさがす" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="名前でさがす">
+      <button type="button" id="students-add" class="btn">＋ 生徒を追加</button>
+    </div>
+    <ul id="students-list" class="students-list"></ul>
+    <p class="sheet-note">予定に入れた名前は、ここに自動で並びます。タップするとメモを書けます。</p>
+  </dialog>
+
+  <!-- 生徒メモ1人分 -->
+  <dialog id="student-dialog" class="sheet">
+    <form id="student-form" method="dialog">
+      <div class="sheet-head">
+        <h2 id="student-title" tabindex="-1">生徒メモ</h2>
+        <button type="button" class="btn" data-close>やめる</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+      <p id="student-error" class="form-error" role="alert"></p>
+      <label class="field">
+        <span class="field-label">名前</span>
+        <input type="text" id="student-name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="例:山田">
+        <small id="student-name-help" class="field-help">名前を変えると、この生徒の予定・固定枠の名前もまとめて変わります(「戻す」で元に戻せます)</small>
+      </label>
+      <label class="field">
+        <span class="field-label">メモ(希望の曜日・時間、注文など)</span>
+        <textarea id="student-memo" rows="6" placeholder="例:火・木の17時以降を希望&#10;発表会でショパンを弾きたい"></textarea>
+      </label>
+      <div id="student-info" class="student-info"></div>
+      <div class="sheet-actions">
+        <button type="button" id="student-delete" class="btn btn-danger">この生徒メモを削除</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- 固定枠の予定を変える・消すときに「この日だけ / この日以降」を選ぶ画面 -->

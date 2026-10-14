@@ -150,3 +150,24 @@ export async function writeExceptions(states) {
   if (deletes.length) check(await supabase.from('recurring_exceptions').delete().in('id', deletes));
   if (upserts.length) check(await supabase.from('recurring_exceptions').upsert(upserts, { onConflict: 'slot_id,date' }));
 }
+
+// ---- 生徒メモ ----
+export async function listStudents() {
+  const rows = check(await supabase.from('students').select('id,name,memo,updated_at'));
+  return rows.map(r => ({ id: r.id, name: r.name, memo: r.memo, updatedAt: r.updated_at }));
+}
+
+export async function writeStudents(states) {
+  const upserts = states.filter(s => s.student).map(({ student: s }) => ({
+    id: s.id, name: s.name, memo: s.memo || '', updated_at: s.updatedAt || new Date().toISOString(),
+  }));
+  const deletes = states.filter(s => !s.student).map(s => s.id);
+  if (upserts.length) check(await supabase.from('students').upsert(upserts));
+  if (deletes.length) check(await supabase.from('students').delete().in('id', deletes));
+}
+
+// その生徒名の予定(ゴミ箱のものは除く)
+export async function lessonsOfStudent(name) {
+  const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS).eq('student', name).is('deleted_at', null));
+  return rows.map(fromRow);
+}
