@@ -152,11 +152,9 @@
       </fieldset>
 
       <fieldset class="field" id="repeat-field">
-        <legend class="field-label">くり返し</legend>
-        <label class="toggle">
-          <input type="checkbox" id="lesson-repeat">
-          <span>毎週この曜日・この時間にくり返す(固定枠)</span>
-        </label>
+        <legend class="field-label">くり返し(固定枠)</legend>
+        <!-- 選択肢は日付に合わせて作る(毎週 水曜日/毎月 第2水曜日/毎月 最終水曜日/毎月 14日) -->
+        <select id="lesson-repeat" class="repeat-select"></select>
         <label id="repeat-end-field" class="end-field" hidden>
           <span>終了日</span>
           <input type="date" id="lesson-repeat-end">
@@ -191,8 +189,8 @@
     </section>
 
     <section class="settings-section">
-      <h3>毎週の固定枠</h3>
-      <p class="sheet-note">予定の入力画面で「毎週この曜日・この時間にくり返す」にチェックすると、ここに並びます。表では ↻ の印が付きます。</p>
+      <h3>くり返しの固定枠(毎週・毎月)</h3>
+      <p class="sheet-note">予定の入力画面の「くり返し」で「毎週」「毎月」を選ぶと、ここに並びます。表では ↻ の印が付きます。</p>
       <ul id="slot-list" class="slot-list"></ul>
       <div class="skip-range">
         <strong>期間をまとめて休みにする(夏休みなど)</strong>

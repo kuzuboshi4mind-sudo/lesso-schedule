@@ -84,8 +84,18 @@ f.durations.addEventListener('change', () => {
 f.start.addEventListener('change', () => renderEndOptions(Number(f.end.value)));
 f.end.addEventListener('change', updateEndLength);
 
-// 「毎週くり返す」をオンにしたときだけ終了日の欄を出す
-f.repeat.addEventListener('change', () => { f.repeatEndField.hidden = !f.repeat.checked; });
+// くり返しの選択肢を、いまの日付に合わせて作り直す(選んでいた種類はなるべく残す)
+function renderRepeatOptions() {
+  const keep = f.repeat.value;
+  const options = f.date.value ? store.ruleOptions(f.date.value) : [];
+  f.repeat.innerHTML = '<option value="">くり返さない</option>'
+    + options.map(o => `<option value="${o.rule}">${o.label}</option>`).join('');
+  f.repeat.value = options.some(o => o.rule === keep) ? keep : '';
+  f.repeatEndField.hidden = !f.repeat.value;
+}
+f.date.addEventListener('change', renderRepeatOptions);
+// くり返すときだけ終了日の欄を出す
+f.repeat.addEventListener('change', () => { f.repeatEndField.hidden = !f.repeat.value; });
 
 // 固定枠の予定を変える・消すとき「この日だけ / この日以降」を選ぶ。選んだ value を返す(やめたら null)
 const scopeDialog = document.getElementById('scope-dialog');
@@ -186,7 +196,8 @@ async function openLesson(lesson) {
   f.recurringInfo.hidden = !occ;
   f.recurringInfo.textContent = occ ? `↻ ${store.slotLabel(lesson.slot)} の固定枠から入った予定です` : '';
   f.repeatField.hidden = occ;
-  f.repeat.checked = false;
+  f.repeat.value = '';
+  renderRepeatOptions();
   f.repeatEnd.value = '';
   f.repeatEndField.hidden = true;
   f.del.textContent = occ ? 'この日を休みにする・固定枠を終える…' : 'この予定を削除';
@@ -218,10 +229,10 @@ form.addEventListener('submit', async e => {
     if (!scope) return;
     if (scope === 'this') await store.saveLesson(values);
     else await store.changeSlotFrom(editing.id, values);
-  } else if (f.repeat.checked) {
+  } else if (f.repeat.value) {
     // 毎週くり返す:固定枠として登録する
     if (f.repeatEnd.value && f.repeatEnd.value < date) { f.error.textContent = '終了日は、この予定の日付より後にしてください'; return; }
-    await store.addSlot(values, f.repeatEnd.value || null);
+    await store.addSlot(values, f.repeatEnd.value || null, f.repeat.value);
   } else {
     await store.saveLesson(values);
   }

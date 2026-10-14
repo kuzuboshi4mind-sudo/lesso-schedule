@@ -108,6 +108,7 @@ function slotFromRow(r) {
   return {
     id: r.id, weekday: r.weekday, start: r.start, duration: r.duration, student: r.student,
     typeId: r.type_id, status: r.status, memo: r.memo, startDate: r.start_date, endDate: r.end_date || null,
+    rule: r.rule || 'weekly', nth: r.nth ?? null, monthDay: r.month_day ?? null,
   };
 }
 
@@ -116,19 +117,22 @@ function slotToRow(s) {
     id: s.id, weekday: s.weekday, start: s.start, duration: s.duration, student: s.student || '',
     type_id: s.typeId || '', status: s.status || 'confirmed', memo: s.memo || '',
     start_date: s.startDate, end_date: s.endDate || null,
+    // 毎月のくり返しの項目(データベースに rule・nth・month_day の列を足してから使える)
+    ...(s.rule && s.rule !== 'weekly' ? { rule: s.rule, nth: s.nth ?? null, month_day: s.monthDay ?? null } : {}),
   };
 }
 
 export async function listSlots() {
-  const rows = check(await supabase.from('recurring_slots')
-    .select('id,weekday,start,duration,student,type_id,status,memo,start_date,end_date'));
+  // '*' で全部の列を読む(毎月のくり返しの列を足す前のデータベースでも動くように)
+  const rows = check(await supabase.from('recurring_slots').select('*'));
   return rows.map(slotFromRow);
 }
 
 export async function writeSlots(states) {
   const upserts = states.filter(s => s.slot).map(s => slotToRow(s.slot));
   const deletes = states.filter(s => !s.slot).map(s => s.id);
-  if (upserts.length) check(await supabase.from('recurring_slots').upsert(upserts));
+  // 1件ずつ保存する(毎週と毎月で持っている項目がちがうため、まとめて送ると空の項目ができてしまう)
+  for (const row of upserts) check(await supabase.from('recurring_slots').upsert(row));
   if (deletes.length) check(await supabase.from('recurring_slots').delete().in('id', deletes));
 }
 

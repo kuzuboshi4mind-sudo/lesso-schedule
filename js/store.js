@@ -284,12 +284,59 @@ function weekdayOf(date) {
   return new Date(y, m - 1, d).getDay();
 }
 
+// くり返しの決まり(rule)
+//  weekly       :毎週(weekday の曜日)
+//  monthly_nth  :毎月 第n○曜日(nth と weekday)
+//  monthly_last :毎月 最終○曜日(weekday)
+//  monthly_day  :毎月 ○日(monthDay。その日がない月はお休み。例:31日は 30日までの月には入らない)
+// 古い固定枠(rule がない)は毎週として扱う
+export const RULES = ['weekly', 'monthly_nth', 'monthly_last', 'monthly_day'];
+
+function dayOf(date) {
+  return Number(date.slice(8, 10));
+}
+
+function daysInMonth(date) {
+  const [y, m] = date.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+// その日付から作れる、くり返しの決まりの候補(入力画面の選択肢に使う)
+export function ruleOptions(date) {
+  const wd = weekdayOf(date), day = dayOf(date), nth = Math.ceil(day / 7);
+  const name = WEEKDAY_NAMES[wd];
+  const options = [
+    { rule: 'weekly', label: `毎週 ${name}曜日` },
+    { rule: 'monthly_nth', label: `毎月 第${nth}${name}曜日` },
+  ];
+  if (day + 7 > daysInMonth(date)) options.push({ rule: 'monthly_last', label: `毎月 最終${name}曜日` });
+  options.push({ rule: 'monthly_day', label: `毎月 ${day}日` });
+  return options;
+}
+
+// 決まりと日付から、固定枠の「いつ」の部分を作る
+function ruleFields(rule, date) {
+  return {
+    rule: rule || 'weekly',
+    weekday: weekdayOf(date),
+    nth: rule === 'monthly_nth' ? Math.ceil(dayOf(date) / 7) : null,
+    monthDay: rule === 'monthly_day' ? dayOf(date) : null,
+  };
+}
+
 function slotActiveOn(slot, date) {
-  return slot.weekday === weekdayOf(date) && slot.startDate <= date && (!slot.endDate || date <= slot.endDate);
+  if (date < slot.startDate || (slot.endDate && date > slot.endDate)) return false;
+  const day = dayOf(date);
+  switch (slot.rule || 'weekly') {
+    case 'monthly_day': return day === slot.monthDay;
+    case 'monthly_nth': return slot.weekday === weekdayOf(date) && Math.ceil(day / 7) === slot.nth;
+    case 'monthly_last': return slot.weekday === weekdayOf(date) && day + 7 > daysInMonth(date);
+    default: return slot.weekday === weekdayOf(date);
+  }
 }
 
 function occurrenceOf(slot, date) {
-  const { id, weekday, startDate, endDate, ...rest } = slot;
+  const { id, weekday, startDate, endDate, rule, nth, monthDay, ...rest } = slot;
   return { ...rest, id: occurrenceId(slot.id, date), date, recurring: { slotId: slot.id, date } };
 }
 
@@ -315,14 +362,22 @@ async function getOccurrence(id) {
 
 const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
-// 「毎週水曜 15:00」のような説明
+// 「毎週水曜 15:00」「毎月第2水曜 15:00」「毎月15日 15:00」のような説明
 export function slotLabel(slot) {
-  return `毎週${WEEKDAY_NAMES[slot.weekday]}曜 ${slot.start}`;
+  const name = WEEKDAY_NAMES[slot.weekday];
+  const when = {
+    monthly_nth: `毎月第${slot.nth}${name}曜`,
+    monthly_last: `毎月最終${name}曜`,
+    monthly_day: `毎月${slot.monthDay}日`,
+  }[slot.rule] || `毎週${name}曜`;
+  return `${when} ${slot.start}`;
 }
 
-// 固定枠の一覧(曜日・時刻の順)
+// 固定枠の一覧(毎週→毎月の順、その中は曜日・日付・時刻の順)
 export async function getSlots() {
-  return (await db.listSlots()).sort((a, b) => a.weekday - b.weekday || toMin(a.start) - toMin(b.start));
+  const order = s => RULES.indexOf(s.rule || 'weekly');
+  return (await db.listSlots()).sort((a, b) =>
+    order(a) - order(b) || (a.monthDay || 0) - (b.monthDay || 0) || a.weekday - b.weekday || toMin(a.start) - toMin(b.start));
 }
 
 function toMin(t) {
@@ -330,10 +385,10 @@ function toMin(t) {
   return h * 60 + m;
 }
 
-// 予定の内容から固定枠を作る(その日の曜日に毎週。endDate は省略可)
-export async function addSlot(lesson, endDate = null) {
+// 予定の内容から固定枠を作る(rule はくり返しの決まり。endDate は省略可)
+export async function addSlot(lesson, endDate = null, rule = 'weekly') {
   const slot = {
-    id: newId(), weekday: weekdayOf(lesson.date), start: lesson.start, duration: lesson.duration,
+    id: newId(), ...ruleFields(rule, lesson.date), start: lesson.start, duration: lesson.duration,
     student: lesson.student || '', typeId: lesson.typeId, status: lesson.status || 'confirmed', memo: lesson.memo || '',
     startDate: lesson.date, endDate: endDate || null,
   };
@@ -372,7 +427,7 @@ export async function changeSlotFrom(id, values) {
   const old = (await db.listSlots()).find(s => s.id === slotId);
   if (!old) return;
   const next = {
-    ...old, id: newId(), weekday: weekdayOf(values.date), start: values.start, duration: values.duration,
+    ...old, id: newId(), ...ruleFields(old.rule, values.date), start: values.start, duration: values.duration,
     student: values.student || '', typeId: values.typeId, status: values.status, memo: values.memo || '',
     startDate: values.date,
   };

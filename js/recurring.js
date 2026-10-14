@@ -28,7 +28,7 @@ export async function renderSlots() {
   const [slots, t] = await Promise.all([store.getSlots(), store.getTypes()]);
   types = t;
   if (!slots.length) {
-    list.innerHTML = '<li class="slot-empty">まだありません。予定の入力画面で「毎週この曜日・この時間にくり返す」にチェックすると登録できます。</li>';
+    list.innerHTML = '<li class="slot-empty">まだありません。予定の入力画面の「くり返し」で「毎週」「毎月」を選ぶと登録できます。</li>';
     return;
   }
   const skipsBySlot = await Promise.all(slots.map(s => store.getSkips(s.id)));

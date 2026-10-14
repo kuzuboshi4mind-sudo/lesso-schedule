@@ -66,6 +66,11 @@ create table if not exists public.recurring_slots (
   created_at  timestamptz not null default now()
 );
 
+-- 毎月のくり返し(2026-10-15 追加)。rule:weekly=毎週 / monthly_nth=毎月第n○曜 / monthly_last=毎月最終○曜 / monthly_day=毎月○日
+alter table public.recurring_slots add column if not exists rule text not null default 'weekly';
+alter table public.recurring_slots add column if not exists nth integer;
+alter table public.recurring_slots add column if not exists month_day integer;
+
 -- ---------- 固定枠の例外(この週だけ休み・変更。手順7で使う)----------
 create table if not exists public.recurring_exceptions (
   id        uuid primary key default gen_random_uuid(),

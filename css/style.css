@@ -839,3 +839,4 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .slot-empty { padding: 8px 0; color: var(--muted); font-size: 0.9rem; }
 .skip-range { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--head); }
 .skip-range label { display: inline-flex; align-items: center; gap: 6px; }
+.sheet select.repeat-select { width: auto; min-width: 220px; }
