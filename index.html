@@ -43,6 +43,8 @@
       <button type="button" id="sel-copy" class="btn">コピー</button>
       <button type="button" id="sel-paste" class="btn">貼り付け</button>
       <button type="button" id="sel-delete" class="btn btn-danger">削除</button>
+      <button type="button" id="sel-undo" class="btn" title="元に戻す(⌘Z)">↶ 戻す</button>
+      <button type="button" id="sel-redo" class="btn" title="やり直す(⇧⌘Z)">↷ やり直す</button>
       <button type="button" id="sel-done" class="btn btn-primary">完了</button>
     </div>
   </div>
@@ -53,24 +55,30 @@
   <!-- 選んだマスに文字を直接入れる画面 -->
   <dialog id="text-dialog" class="sheet sheet-small">
     <form id="text-form" method="dialog">
-      <h2>文字を入力</h2>
+      <div class="sheet-head">
+        <h2>文字を入力</h2>
+        <button type="button" class="btn" data-close>やめる</button>
+        <button type="submit" class="btn btn-primary">入れる</button>
+      </div>
       <p id="text-target" class="sheet-note"></p>
       <label class="field">
         <span class="field-label">名前・内容</span>
         <input type="text" id="text-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       </label>
-      <div class="sheet-actions">
-        <span class="spacer"></span>
-        <button type="button" class="btn" data-close>やめる</button>
-        <button type="submit" class="btn btn-primary">入れる</button>
-      </div>
     </form>
   </dialog>
 
   <!-- 予定(レッスン)の入力画面 -->
   <dialog id="lesson-dialog" class="sheet">
     <form id="lesson-form" method="dialog">
-      <h2 id="lesson-dialog-title">予定を追加</h2>
+      <!-- 上の帯:題名と「やめる」「保存」(下までスクロールしなくても押せるように) -->
+      <div class="sheet-head">
+        <!-- 開いたときはここを選んだ状態にする(日付の欄が選ばれてカレンダーが勝手に開くのを防ぐ) -->
+        <h2 id="lesson-dialog-title" tabindex="-1" autofocus>予定を追加</h2>
+        <button type="button" class="btn" data-close>やめる</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
+      <p id="lesson-error" class="form-error" role="alert"></p>
 
       <div class="field-row">
         <label class="field">
@@ -116,13 +124,8 @@
         <textarea id="lesson-memo" rows="2" placeholder="例:発表会の曲を練習"></textarea>
       </label>
 
-      <p id="lesson-error" class="form-error" role="alert"></p>
-
       <div class="sheet-actions">
-        <button type="button" id="lesson-delete" class="btn btn-danger">削除</button>
-        <span class="spacer"></span>
-        <button type="button" class="btn" data-close>やめる</button>
-        <button type="submit" class="btn btn-primary">保存</button>
+        <button type="button" id="lesson-delete" class="btn btn-danger">この予定を削除</button>
       </div>
     </form>
   </dialog>
@@ -130,16 +133,17 @@
   <!-- 日ごとのメモ(「予定」の行)の入力画面 -->
   <dialog id="note-dialog" class="sheet sheet-small">
     <form id="note-form" method="dialog">
-      <h2><span id="note-date"></span> の予定</h2>
+      <div class="sheet-head">
+        <h2><span id="note-date"></span> の予定</h2>
+        <button type="button" class="btn" data-close>やめる</button>
+        <button type="submit" class="btn btn-primary">保存</button>
+      </div>
       <label class="field">
         <span class="field-label">メモ(例:サンパル、休み、ライブ)</span>
         <input type="text" id="note-text" autocomplete="off">
       </label>
       <div class="sheet-actions">
         <button type="button" id="note-clear" class="btn btn-danger">消す</button>
-        <span class="spacer"></span>
-        <button type="button" class="btn" data-close>やめる</button>
-        <button type="submit" class="btn btn-primary">保存</button>
       </div>
     </form>
   </dialog>

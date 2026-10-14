@@ -2,8 +2,12 @@
 // ・長押し → そのマスを選択。指を離さずになぞると範囲を選択できる
 // ・選択中にタップ → そのマスだけを選択し直す(Mac は Shift+クリックで範囲を広げる)
 // ・下に出る操作バーで「文字を入力」「コピー」「貼り付け」「削除」
-// ・Mac:右クリックでも選択。⌘C / ⌘V / delete / return / esc も使える
+// ・「戻す」「やり直す」で、直前の操作を取り消す/もう一度行う
+// ・Mac のキー操作(選択中):矢印で移動、Shift+矢印で範囲、⌘A 全部、⌘C コピー、⌘X 切り取り、⌘V 貼り付け、
+//   delete 削除、return 編集(予定が1件なら入力画面、それ以外は文字を入力)、esc 選択をやめる
+//   (いつでも):⌘Z 元に戻す、⇧⌘Z / ⌘Y やり直す
 import * as store from './store.js';
+import { openExistingLesson } from './editor.js';
 import { timeSlots, toMinutes, fromMinutes, escapeHtml } from './calendar.js';
 
 const LONG_PRESS_MS = 450;    // 長押しと判定する時間
@@ -25,6 +29,8 @@ let lastTouchAt = 0;         // タッチ操作のあとに来る、まねのマ
 const bar = document.getElementById('selection-bar');
 const barInfo = document.getElementById('selection-info');
 const pasteBtn = document.getElementById('sel-paste');
+const undoBtn = document.getElementById('sel-undo');
+const redoBtn = document.getElementById('sel-redo');
 const toast = document.getElementById('toast');
 const textDialog = document.getElementById('text-dialog');
 const textForm = document.getElementById('text-form');
@@ -52,10 +58,12 @@ export function initSelection(opts) {
   });
 
   document.getElementById('sel-text').addEventListener('click', openTextInput);
-  document.getElementById('sel-copy').addEventListener('click', copySelection);
+  document.getElementById('sel-copy').addEventListener('click', () => copySelection());
   pasteBtn.addEventListener('click', pasteSelection);
   document.getElementById('sel-delete').addEventListener('click', deleteSelection);
   document.getElementById('sel-done').addEventListener('click', clearSelection);
+  undoBtn.addEventListener('click', undo);
+  redoBtn.addEventListener('click', redo);
   document.addEventListener('keydown', onKeyDown);
 
   textForm.addEventListener('submit', e => { e.preventDefault(); saveText(); });
@@ -236,6 +244,8 @@ function paint() {
   const count = lessonsInRange(r).length;
   barInfo.textContent = `${days} ${SLOTS[r.i1]}〜${fromMinutes(r.bottom)}${count ? `(予定${count}件)` : ''}`;
   pasteBtn.disabled = !readClipboard();
+  undoBtn.disabled = !store.canUndo();
+  redoBtn.disabled = !store.canRedo();
   bar.hidden = false;
 }
 
@@ -274,7 +284,7 @@ async function saveText() {
     await store.addLessons(r.dates.map(date => ({
       date, start: SLOTS[r.i1], duration: r.bottom - r.top,
       student: text, typeId: last.typeId, status: last.status, memo: '',
-    })));
+    })), `文字を入力「${text}」`);
   }
   onChanged();
 }
@@ -283,11 +293,11 @@ function readClipboard() {
   try { return JSON.parse(localStorage.getItem(CLIP_KEY)); } catch { return null; }
 }
 
-async function copySelection() {
+async function copySelection({ cut = false } = {}) {
   const r = range();
   if (!r) return;
   const items = lessonsInRange(r);
-  if (!items.length) return showToast('コピーする予定がありません');
+  if (!items.length) return showToast(`${cut ? '切り取る' : 'コピーする'}予定がありません`);
   // 選んだ範囲の左上からの「何日後・何分後」で覚える(貼り付け先でも同じ並びになる)
   const clip = items.map(l => ({
     dayOffset: daysBetween(r.dates[0], l.date),
@@ -298,8 +308,14 @@ async function copySelection() {
   // ほかのアプリ(メモなど)にも貼れるよう、文字でもコピーしておく
   const text = items.map(l => `${shortDate(l.date)} ${l.start} ${l.student}(${l.duration}分)`).join('\n');
   navigator.clipboard?.writeText(text).catch(() => {});
-  showToast(`${items.length}件コピーしました`);
-  paint();
+  if (cut) {
+    await store.deleteLessons(items.map(l => l.id), '切り取り');
+    showToast(`${items.length}件切り取りました`);
+    onChanged();
+  } else {
+    showToast(`${items.length}件コピーしました`);
+    paint();
+  }
 }
 
 async function pasteSelection() {
@@ -314,7 +330,7 @@ async function pasteSelection() {
     const { dayOffset, minOffset, ...rest } = c;
     added.push({ ...rest, date: addDays(r.dates[0], dayOffset), start: fromMinutes(start) });
   }
-  if (added.length) await store.addLessons(added);
+  if (added.length) await store.addLessons(added, '貼り付け');
   showToast(`${added.length}件貼り付けました${skipped ? `(${skipped}件は24:00を過ぎるため省略)` : ''}`);
   onChanged();
 }
@@ -324,22 +340,87 @@ async function deleteSelection() {
   if (!r) return;
   const items = lessonsInRange(r);
   if (!items.length) return showToast('削除する予定がありません');
-  const names = items.slice(0, 5).map(l => l.student || '(名前なし)').join('、') + (items.length > 5 ? ' ほか' : '');
-  if (!confirm(`${items.length}件の予定を削除しますか?\n${names}`)) return;
+  // 「戻す」で元に戻せるので、確認は出さない(Numbers と同じ)
   await store.deleteLessons(items.map(l => l.id));
-  showToast(`${items.length}件削除しました`);
+  showToast(`${items.length}件削除しました(「戻す」で元に戻せます)`);
   onChanged();
 }
 
-// Mac のキーボード操作
+// 元に戻す・やり直す
+async function undo() {
+  const label = await store.undo();
+  showToast(label ? `元に戻しました:${label}` : 'これ以上戻せません');
+  if (label) onChanged(); else paint();
+}
+
+async function redo() {
+  const label = await store.redo();
+  showToast(label ? `やり直しました:${label}` : 'やり直す操作がありません');
+  if (label) onChanged(); else paint();
+}
+
+// return:1マスに予定が1件ならその入力画面、それ以外は「文字を入力」
+function editSelection() {
+  const r = range();
+  if (!r) return;
+  const inside = lessonsInRange(r);
+  if (r.dates.length === 1 && r.i1 === r.i2 && inside.length === 1) openExistingLesson(inside[0].id);
+  else openTextInput();
+}
+
+// 矢印キー:選択を動かす(Shift を押しながらだと範囲を広げる)
+function moveSelection(dCol, dRow, extend) {
+  const cols = dateColumns();
+  if (!anchor) {
+    // まだ何も選んでいなければ、今日(なければ1日)の 10:00 から始める
+    const today = table.querySelector('thead .row-date th.today')?.dataset.date;
+    anchor = focus = { date: today || cols[0], idx: SLOTS.indexOf('10:00') };
+  } else {
+    const from = extend ? focus : anchor;
+    const col = Math.min(cols.length - 1, Math.max(0, cols.indexOf(from.date) + dCol));
+    const idx = Math.min(SLOTS.length - 1, Math.max(0, from.idx + dRow));
+    const next = { date: cols[col], idx };
+    if (extend) focus = next; else anchor = focus = next;
+  }
+  paint();
+  table.querySelector(`td[data-date="${focus.date}"][data-time="${SLOTS[focus.idx]}"]`)
+    ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function selectAll() {
+  const cols = dateColumns();
+  anchor = { date: cols[0], idx: 0 };
+  focus = { date: cols[cols.length - 1], idx: SLOTS.length - 1 };
+  paint();
+}
+
+// Mac のキーボード操作(iPad に外付けキーボードをつないだときも同じ)
+const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
 function onKeyDown(e) {
-  if (!anchor || document.querySelector('dialog[open]')) return;
+  // 入力画面が開いているとき・文字を打っているときは、キーをそのまま入力に使う
+  if (document.querySelector('dialog[open]')) return;
+  if (e.target.closest?.('input, textarea, select')) return;
   const mod = e.metaKey || e.ctrlKey;
+  const key = e.key.toLowerCase();
+
+  // いつでも使える:元に戻す・やり直す
+  if (mod && key === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
+  if (mod && key === 'y') { e.preventDefault(); return redo(); }
+  if (mod && key === 'a') { e.preventDefault(); return selectAll(); }
+  if (ARROWS[e.key] && !mod) {
+    e.preventDefault();
+    return moveSelection(...ARROWS[e.key], e.shiftKey);
+  }
+
+  // ここから下は、マスを選んでいるときだけ
+  if (!anchor) return;
   if (e.key === 'Escape') clearSelection();
   else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); deleteSelection(); }
-  else if (e.key === 'Enter') { e.preventDefault(); openTextInput(); }
-  else if (mod && e.key === 'c') { e.preventDefault(); copySelection(); }
-  else if (mod && e.key === 'v') { e.preventDefault(); pasteSelection(); }
+  else if (e.key === 'Enter') { e.preventDefault(); editSelection(); }
+  else if (mod && key === 'c') { e.preventDefault(); copySelection(); }
+  else if (mod && key === 'x') { e.preventDefault(); copySelection({ cut: true }); }
+  else if (mod && key === 'v') { e.preventDefault(); pasteSelection(); }
 }
 
 // ---------------------------------------------------------

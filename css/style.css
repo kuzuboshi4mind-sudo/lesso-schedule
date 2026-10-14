@@ -404,6 +404,25 @@ body {
   font-size: 1.2rem;
   color: var(--accent);
 }
+.sheet h2:focus { outline: none; }
+
+/* 入力画面の上の帯(題名・やめる・保存)。中身をスクロールしても上に残る */
+.sheet-head {
+  position: sticky;
+  top: -20px;              /* .sheet の上の余白(20px)の分 */
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -20px -20px 12px;
+  padding: 14px 20px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.sheet-head h2 {
+  flex: 1;
+  margin: 0;
+}
 
 .field {
   display: block;
@@ -488,7 +507,6 @@ body {
 .type-chip input:checked + span::before { border-color: var(--type-text); }
 
 .form-error {
-  min-height: 1.2em;
   margin: 0 0 8px;
   color: var(--danger);
   font-size: 0.9rem;
@@ -602,3 +620,4 @@ body {
 }
 .toast[hidden] { display: none; }
 body.has-selection .calendar-scroll { padding-bottom: 130px; }
+.form-error:empty { display: none; }

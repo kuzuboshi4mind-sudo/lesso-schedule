@@ -154,8 +154,9 @@ async function openLesson(lesson) {
   f.error.textContent = '';
   f.del.hidden = !lesson.id;
   dialog.showModal();
-  // 新規のときは名前の欄にすぐ入力できるように(iPhone はキーボードが出る)
-  if (!lesson.id) f.student.focus();
+  // 題名の部分を選んだ状態で開く(日付の欄が選ばれて、カレンダーが勝手に開かないように)
+  f.title.focus();
+  dialog.scrollTop = 0;
 }
 
 form.addEventListener('submit', async e => {
@@ -231,6 +232,16 @@ document.getElementById('note-clear').addEventListener('click', async () => {
 for (const d of [dialog, noteDialog]) {
   d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
   d.addEventListener('click', e => { if (e.target === d) d.close(); });
+}
+
+// Mac:⌘S または ⌘return で保存
+for (const [d, frm] of [[dialog, form], [noteDialog, noteForm]]) {
+  d.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 's' || e.key === 'Enter')) {
+      e.preventDefault();
+      frm.requestSubmit();
+    }
+  });
 }
 
 // 保存・削除のあとに呼ぶ関数(表を描き直す)を登録する

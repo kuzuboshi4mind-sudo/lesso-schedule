@@ -79,37 +79,100 @@ export async function getLesson(id) {
   return load(KEYS.lessons, []).find(l => l.id === id) || null;
 }
 
-// まとめて追加する(貼り付け・文字の直接入力で使う)
-export async function addLessons(lessons) {
+// ---- 書き込みの共通部分と「元に戻す / やり直す」----
+// 変更はすべて「変更前 → 変更後」の組で記録する(新規は変更前が null、削除は変更後が null)。
+// 元に戻すときは変更前の状態を、やり直すときは変更後の状態を書き戻す。
+// 記録はこの画面を開いている間だけ(読み込み直すと消える)。最大50回分。
+const HISTORY_LIMIT = 50;
+const undoStack = [];
+const redoStack = [];
+
+// レッスンの状態を書き込む:states は [{ id, lesson|null }](null は削除)
+function writeLessonStates(states) {
   const all = load(KEYS.lessons, []);
+  const byId = new Map(all.map(l => [l.id, l]));
+  for (const { id, lesson } of states) {
+    if (lesson) byId.set(id, lesson); else byId.delete(id);
+  }
+  save(KEYS.lessons, [...byId.values()]);
+}
+
+function writeNoteStates(states) {
+  const all = load(KEYS.dayNotes, {});
+  for (const { date, text } of states) {
+    if (text) all[date] = text; else delete all[date];
+  }
+  save(KEYS.dayNotes, all);
+}
+
+// 変更を記録して書き込む。label は「元に戻しました:〇〇」の表示に使う
+// change = { label, lessons:[{ before, after }], notes:[{ date, before, after }] }
+function commit(change) {
+  const lessons = change.lessons || [];
+  const notes = change.notes || [];
+  writeLessonStates(lessons.map(c => ({ id: (c.after || c.before).id, lesson: c.after })));
+  writeNoteStates(notes.map(c => ({ date: c.date, text: c.after })));
+  undoStack.push({ label: change.label, lessons, notes });
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function applyHistory(entry, useAfter) {
+  writeLessonStates(entry.lessons.map(c => ({ id: (c.after || c.before).id, lesson: useAfter ? c.after : c.before })));
+  writeNoteStates(entry.notes.map(c => ({ date: c.date, text: useAfter ? c.after : c.before })));
+}
+
+export function canUndo() { return undoStack.length > 0; }
+export function canRedo() { return redoStack.length > 0; }
+
+// 1つ前の状態に戻す。戻した操作の説明を返す(戻すものがなければ null)
+export async function undo() {
+  const entry = undoStack.pop();
+  if (!entry) return null;
+  applyHistory(entry, false);
+  redoStack.push(entry);
+  return entry.label;
+}
+
+// 戻した操作をもう一度行う
+export async function redo() {
+  const entry = redoStack.pop();
+  if (!entry) return null;
+  applyHistory(entry, true);
+  undoStack.push(entry);
+  return entry.label;
+}
+
+function nameOf(l) {
+  return l.student || '(名前なし)';
+}
+
+// まとめて追加する(貼り付け・文字の直接入力で使う)
+export async function addLessons(lessons, label = '追加') {
   const added = lessons.map(l => ({ ...l, id: newId() }));
-  save(KEYS.lessons, all.concat(added));
+  commit({ label: `${label}(${added.length}件)`, lessons: added.map(a => ({ before: null, after: a })) });
   return added;
 }
 
 // まとめて削除する
-export async function deleteLessons(ids) {
+export async function deleteLessons(ids, label = '削除') {
   const set = new Set(ids);
-  save(KEYS.lessons, load(KEYS.lessons, []).filter(l => !set.has(l.id)));
+  const targets = load(KEYS.lessons, []).filter(l => set.has(l.id));
+  commit({ label: `${label}(${targets.length}件)`, lessons: targets.map(t => ({ before: t, after: null })) });
 }
 
 // 新規(id なし)なら追加、id ありなら上書き
 export async function saveLesson(lesson) {
-  const all = load(KEYS.lessons, []);
-  if (lesson.id) {
-    const i = all.findIndex(l => l.id === lesson.id);
-    if (i >= 0) all[i] = lesson; else all.push(lesson);
-  } else {
-    lesson = { ...lesson, id: newId() };
-    all.push(lesson);
-  }
-  save(KEYS.lessons, all);
-  return lesson;
+  const before = lesson.id ? load(KEYS.lessons, []).find(l => l.id === lesson.id) || null : null;
+  const after = lesson.id ? lesson : { ...lesson, id: newId() };
+  commit({ label: `${before ? '変更' : '追加'}:${nameOf(after)}`, lessons: [{ before, after }] });
+  return after;
 }
 
-// 手順6でゴミ箱方式に変える。今はすぐ消す
+// 手順6でゴミ箱方式に変える。今はすぐ消す(元に戻すことはできる)
 export async function deleteLesson(id) {
-  save(KEYS.lessons, load(KEYS.lessons, []).filter(l => l.id !== id));
+  const before = load(KEYS.lessons, []).find(l => l.id === id);
+  if (before) commit({ label: `削除:${nameOf(before)}`, lessons: [{ before, after: null }] });
 }
 
 // 入力したことのある生徒名の一覧(入力欄の候補に出す)
@@ -127,9 +190,10 @@ export async function getDayNotes(year, month) {
 }
 
 export async function saveDayNote(date, text) {
-  const all = load(KEYS.dayNotes, {});
-  if (text.trim()) all[date] = text.trim(); else delete all[date];
-  save(KEYS.dayNotes, all);
+  const before = load(KEYS.dayNotes, {})[date] || null;
+  const after = text.trim() || null;
+  if (before === after) return;
+  commit({ label: `予定の行:${after || before}`, notes: [{ date, before, after }] });
 }
 
 // ---- 前回の入力(新しく入れるとき、種類・長さ・状態を前回と同じにする)----
