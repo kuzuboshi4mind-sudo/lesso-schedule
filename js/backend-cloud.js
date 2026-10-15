@@ -14,6 +14,24 @@ function check({ data, error }) {
   return data;
 }
 
+// Supabase は1回に1000件までしか返さないので、全部そろうまで続けて読む(order は並びを決める列)
+const PAGE = 1000;
+async function readAll(makeQuery, order = 'id') {
+  const out = [];
+  for (let from = 0; ; from += PAGE) {
+    const rows = check(await makeQuery().order(order).range(from, from + PAGE - 1));
+    out.push(...rows);
+    if (rows.length < PAGE) return out;
+  }
+}
+
+// 長い一覧を小分けにする(1回に送る件数を抑える。id を並べすぎると問い合わせが長くなりすぎるため)
+function chunks(list, size) {
+  const out = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
 // データベースの1行 ⇔ アプリの予定の形
 function fromRow(r) {
   return {
@@ -35,15 +53,15 @@ function toRow(l) {
 const LESSON_COLUMNS = 'id,date,start,duration,student,type_id,status,memo,deleted_at';
 
 export async function listLessons(from, to) {
-  const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS)
+  const rows = await readAll(() => supabase.from('lessons').select(LESSON_COLUMNS)
     .gte('date', from).lte('date', to).is('deleted_at', null));
   return rows.map(fromRow);
 }
 
 // ゴミ箱の中の予定(ゴミ箱に入れた日時が新しい順)
 export async function listTrash() {
-  const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS)
-    .not('deleted_at', 'is', null).order('deleted_at', { ascending: false }).limit(2000));
+  const rows = await readAll(() => supabase.from('lessons').select(LESSON_COLUMNS)
+    .not('deleted_at', 'is', null).order('deleted_at', { ascending: false }));
   return rows.map(fromRow);
 }
 
@@ -53,8 +71,10 @@ export async function purgeTrash(before) {
 }
 
 export async function getLessonsByIds(ids) {
-  if (!ids.length) return [];
-  const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS).in('id', ids));
+  const rows = [];
+  for (const part of chunks(ids, 100)) {
+    rows.push(...check(await supabase.from('lessons').select(LESSON_COLUMNS).in('id', part)));
+  }
   return rows.map(fromRow);
 }
 
@@ -66,19 +86,19 @@ export async function countLessonsOfType(typeId) {
 }
 
 export async function studentNames() {
-  const rows = check(await supabase.from('lessons').select('student').is('deleted_at', null).limit(10000));
+  const rows = await readAll(() => supabase.from('lessons').select('id,student').is('deleted_at', null));
   return rows.map(r => r.student);
 }
 
 export async function writeLessons(states) {
   const upserts = states.filter(s => s.lesson).map(s => toRow(s.lesson));
   const deletes = states.filter(s => !s.lesson).map(s => s.id);
-  if (upserts.length) check(await supabase.from('lessons').upsert(upserts));
-  if (deletes.length) check(await supabase.from('lessons').delete().in('id', deletes));
+  for (const part of chunks(upserts, 500)) check(await supabase.from('lessons').upsert(part));
+  for (const part of chunks(deletes, 100)) check(await supabase.from('lessons').delete().in('id', part));
 }
 
 export async function listNotes(from, to) {
-  const rows = check(await supabase.from('day_notes').select('date,text').gte('date', from).lte('date', to));
+  const rows = await readAll(() => supabase.from('day_notes').select('date,text').gte('date', from).lte('date', to), 'date');
   return Object.fromEntries(rows.map(r => [r.date, r.text]));
 }
 
@@ -90,8 +110,8 @@ export async function getNote(date) {
 export async function writeNotes(states) {
   const upserts = states.filter(s => s.text).map(s => ({ date: s.date, text: s.text }));
   const deletes = states.filter(s => !s.text).map(s => s.date);
-  if (upserts.length) check(await supabase.from('day_notes').upsert(upserts, { onConflict: 'user_id,date' }));
-  if (deletes.length) check(await supabase.from('day_notes').delete().in('date', deletes));
+  for (const part of chunks(upserts, 500)) check(await supabase.from('day_notes').upsert(part, { onConflict: 'user_id,date' }));
+  for (const part of chunks(deletes, 100)) check(await supabase.from('day_notes').delete().in('date', part));
 }
 
 export async function getSetting(key) {
@@ -137,7 +157,7 @@ export async function writeSlots(states) {
 }
 
 export async function listExceptions(from, to) {
-  const rows = check(await supabase.from('recurring_exceptions').select('id,slot_id,date,action,lesson')
+  const rows = await readAll(() => supabase.from('recurring_exceptions').select('id,slot_id,date,action,lesson')
     .gte('date', from).lte('date', to));
   return rows.map(r => ({ id: r.id, slotId: r.slot_id, date: r.date, action: r.action, lessonId: r.lesson?.lessonId || null }));
 }
@@ -147,7 +167,7 @@ export async function writeExceptions(states) {
     id: x.id, slot_id: x.slotId, date: x.date, action: x.action, lesson: x.lessonId ? { lessonId: x.lessonId } : null,
   }));
   const deletes = states.filter(s => !s.exception).map(s => s.id);
-  if (deletes.length) check(await supabase.from('recurring_exceptions').delete().in('id', deletes));
+  for (const part of chunks(deletes, 100)) check(await supabase.from('recurring_exceptions').delete().in('id', part));
   if (upserts.length) check(await supabase.from('recurring_exceptions').upsert(upserts, { onConflict: 'slot_id,date' }));
 }
 
@@ -168,7 +188,7 @@ export async function writeStudents(states) {
 
 // その生徒名の予定(ゴミ箱のものは除く)
 export async function lessonsOfStudent(name) {
-  const rows = check(await supabase.from('lessons').select(LESSON_COLUMNS).eq('student', name).is('deleted_at', null));
+  const rows = await readAll(() => supabase.from('lessons').select(LESSON_COLUMNS).eq('student', name).is('deleted_at', null));
   return rows.map(fromRow);
 }
 
