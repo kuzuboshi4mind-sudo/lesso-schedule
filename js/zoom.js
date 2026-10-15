@@ -2,12 +2,19 @@
 // ・表の上で2本指をつまむ(ピンチイン)と縮小。いちばん小さくすると、その月が1画面に収まる
 // ・2本指を広げる(ピンチアウト)と拡大
 // ・上の「1か月表示」ボタンで、1画面に収まる大きさと元の大きさを切り替え
+// ・スマホは、文字が読めるように日付の列をせまくしすぎない(縦は1日分が収まり、横はスクロール)
 // ・Mac:⌘ を押しながらスクロール(またはトラックパッドのピンチ)で拡大・縮小
 // 大きさは端末ごとに覚えておく(次に開いたときも同じ大きさ)
 
-const BASE = { timeCol: 56, dayCol: 58, headRows: 34 + 26 + 40, rows: 36 };
-// 30分の行の高さ(拡大率1のとき)。スマホでは小さいので、CSS の --row-base から読む
-const baseRow = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-base')) || 34;
+const BASE = { timeCol: 56, headRows: 34 + 26 + 40, rows: 36 };
+// 30分の行の高さと日付の列の幅(拡大率1のとき)。スマホでは変わるので、CSS の --row-base / --day-base から読む
+const cssPx = (name, fallback) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
+const baseRow = () => cssPx('--row-base', 34);
+const baseDay = () => cssPx('--day-base', 58);
+// スマホ(幅がせまい、または横向きで高さが低い画面)かどうか。CSS の @media と同じ条件
+const phoneQuery = window.matchMedia('(max-width: 600px), (max-height: 500px)');
+const PHONE_MIN_DAY = 54;     // スマホで日付の列をこれより細くしない(px。名前が3〜4文字読める幅)
+const PHONE_MIN_FONT = 0.9;   // スマホで文字をこれより小さくしない(元の大きさに対する倍率)
 const MAX = 1.8;            // いちばん大きくしたとき(元の1.8倍)
 const SAVE_KEY = 'lesso.zoom';
 
@@ -52,14 +59,18 @@ function fitScale() {
   for (let i = 0; i < 4; i++) {
     const zf = fontScale(fx, fy);
     const timeCol = BASE.timeCol * Math.max(zf, 0.8);
-    fx = (w - timeCol - 4) / (days * BASE.dayCol);
+    fx = (w - timeCol - 4) / (days * baseDay());
     fy = (h - BASE.headRows * zf - 4) / (BASE.rows * baseRow());
   }
+  // スマホは1か月を横に全部入れると文字が読めないので、列の幅に下限をつける(残りは横スクロール)
+  if (phoneQuery.matches) fx = Math.max(fx, PHONE_MIN_DAY / baseDay());
   return { fx: Math.min(fx, 1), fy: Math.min(fy, 1) };
 }
 
 // 文字の大きさは、横と縦の小さいほうに合わせる(小さくなりすぎないよう 0.6 倍まで)
+// スマホは行がもともと低いので、縦に縮めても文字は小さくせず、横の拡大率に合わせる(0.9 倍まで)
 function fontScale(x, y) {
+  if (phoneQuery.matches) return Math.min(1.4, Math.max(PHONE_MIN_FONT, x));
   return Math.min(1.4, Math.max(0.6, Math.min(x, y)));
 }
 
@@ -105,8 +116,11 @@ function toggleFit() {
     table.querySelector('thead th.today')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   } else {
     zoomTo(fx, fy, r.left, r.top);
-    scroller.scrollLeft = 0;
     scroller.scrollTop = 0;
+    // 横に収まりきらないとき(スマホ)は、今日の列が見える位置に。収まるときは左端から
+    const today = table.querySelector('thead th.today');
+    const timeCol = table.querySelector('.time-col').offsetWidth;
+    scroller.scrollLeft = today ? Math.max(0, today.offsetLeft - timeCol - today.offsetWidth) : 0;
   }
 }
 

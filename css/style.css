@@ -26,7 +26,8 @@
   --zy: 1;
   --zf: 1;
   --time-col: calc(56px * max(var(--zf), 0.8));  /* 時刻の列の幅 */
-  --day-col: calc(58px * var(--zx));             /* 日付の列の幅 */
+  --day-base: 58px;                              /* 日付の列の幅(拡大率1のとき。スマホは下で広くする) */
+  --day-col: calc(var(--day-base) * var(--zx));  /* 日付の列の幅 */
   --row-base: 34px;                              /* 30分の行の高さ(拡大率1のとき。スマホは下で小さくする) */
   --row: calc(var(--row-base) * var(--zy));      /* 30分の行の高さ */
   --h-date: calc(34px * var(--zf));              /* 日付の行の高さ */
@@ -292,12 +293,19 @@ body {
 /* スマホ(幅がせまい、または横向きで高さが低い画面)は、30分の行の高さを 2/3 にする
    iPad はどちらの向きでも当てはまらないので、今までどおり */
 @media (max-width: 600px), (max-height: 500px) {
-  :root { --row-base: 20px; }
+  /* 行は低く、列は広く(名前が読めるように) */
+  :root { --row-base: 18px; --day-base: 72px; }
   /* 30分以下の予定は、名前を1行にして収める */
   .lesson.half { padding-top: 0; padding-bottom: 0; }
   .lesson.half .lesson-name { white-space: nowrap; text-overflow: ellipsis; }
+  /* 名前は1行にして(入りきらなければ「…」)、たての1文字ずつの折り返しを防ぐ */
+  .lesson-name { white-space: nowrap; text-overflow: ellipsis; }
   /* 15分・20分は高さが小さいので、文字を小さくし、枠を細くする */
-  .calendar .lesson.short { font-size: 0.62em; line-height: 1; padding: 0 2px; border-width: 1px; border-radius: 3px; }
+  /* 15分・20分:行が低いので、すき間をなくして高さいっぱいに名前を出す */
+  .calendar .lesson.short {
+    height: calc(var(--dur) / 30 * var(--row) - 1px);
+    font-size: 0.66em; line-height: 1; padding: 0 2px; border-width: 1px; border-radius: 3px;
+  }
 }
 
 /* =========================================================
