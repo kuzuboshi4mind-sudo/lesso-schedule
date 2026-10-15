@@ -123,6 +123,10 @@ export async function getLesson(id) {
   return (await db.getLessonsByIds([id]))[0] || null;
 }
 
+// 「すべての期間」を表す日付(データベースが受け付ける日付にする。0000年は日付として存在しないので使えない)
+const ALL_FROM = '1900-01-01';
+const ALL_TO = '2999-12-31';
+
 // ---- 書き込みの共通部分と「元に戻す / やり直す」----
 // 変更はすべて「変更前 → 変更後」の組で記録する(新規は変更前が null、削除は変更後が null)。
 // 元に戻すときは変更前の状態を、やり直すときは変更後の状態を書き戻す。
@@ -463,7 +467,7 @@ export async function updateSlot(slot) {
 export async function deleteSlot(slotId) {
   const slot = (await db.listSlots()).find(s => s.id === slotId);
   if (!slot) return;
-  const exceptions = (await db.listExceptions('0000-01-01', '9999-12-31')).filter(x => x.slotId === slotId);
+  const exceptions = (await db.listExceptions(ALL_FROM, ALL_TO)).filter(x => x.slotId === slotId);
   await commit({
     label: `固定枠を削除:${slotLabel(slot)} ${nameOf(slot)}`,
     slots: [{ before: slot, after: null }],
@@ -473,7 +477,7 @@ export async function deleteSlot(slotId) {
 
 // 固定枠ごとの「休みにした日」
 export async function getSkips(slotId) {
-  return (await db.listExceptions('0000-01-01', '9999-12-31'))
+  return (await db.listExceptions(ALL_FROM, ALL_TO))
     .filter(x => x.slotId === slotId && x.action === 'skip').sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -500,10 +504,10 @@ const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
 // 書き出すデータを作る。month を省くと全部
 // 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
 export async function buildBackup(year, month) {
-  const [from, to] = year ? monthRange(year, month) : ['0000-01-01', '9999-12-31'];
+  const [from, to] = year ? monthRange(year, month) : [ALL_FROM, ALL_TO];
   const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents, tentativeMonths, studentExtras] = await Promise.all([
     db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
-    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'), db.listStudents(), getHiddenStudents(), db.listMonths(), getStudentExtras(),
+    db.listSlots(), db.listExceptions(ALL_FROM, ALL_TO), db.listStudents(), getHiddenStudents(), db.listMonths(), getStudentExtras(),
   ]);
   const months = year
     ? [`${year}-${String(month).padStart(2, '0')}`]
@@ -580,7 +584,7 @@ export async function restoreBackup(data, { withSettings = false } = {}) {
   // 「設定も戻す」を選んだときは、毎週の固定枠もファイルの内容にそろえる
   const slotChanges = [], excChanges = [];
   if (withSettings && data.recurring) {
-    const [curSlots, curExc] = await Promise.all([db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31')]);
+    const [curSlots, curExc] = await Promise.all([db.listSlots(), db.listExceptions(ALL_FROM, ALL_TO)]);
     const sync = (current, wanted, out) => {
       const wantedIds = new Set(wanted.map(x => x.id));
       const byId = new Map(current.map(x => [x.id, x]));
