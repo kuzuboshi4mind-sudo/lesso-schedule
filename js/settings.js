@@ -22,6 +22,7 @@ export function initSettings(opts) {
   document.getElementById('open-settings').addEventListener('click', openSettings);
   dialog.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
   document.getElementById('add-type').addEventListener('click', addType);
+  document.getElementById('numbers-colors').addEventListener('click', useNumbersColors);
   document.getElementById('add-rule').addEventListener('click', addRule);
   typeList.addEventListener('click', onTypeClick);
   typeList.addEventListener('input', onTypeInput);
@@ -44,6 +45,13 @@ async function openSettings() {
 // ---------------------------------------------------------
 // 種類と色
 // ---------------------------------------------------------
+// 今まで使っていた Numbers と同じ色にする(名前・集計に入れるか・自分で足した種類はそのまま)
+async function useNumbersColors() {
+  if (!confirm('種類の色を、Numbers で使っていた色にそろえますか?\n(自宅=黄緑、OKI川口=山吹、OKI加茂=サーモン、サンパル=水色、訪問=青、オンライン=青緑、JINIS=薄いピンク。自分で足した種類の色は変えません)')) return;
+  types = types.map(t => (store.NUMBERS_COLORS[t.id] ? { ...t, color: store.NUMBERS_COLORS[t.id] } : t));
+  await saveTypes(-1);
+}
+
 function renderTypes(openIndex = -1) {
   typeList.innerHTML = types.map((t, i) => `
     <li class="type-row${i === openIndex ? ' open' : ''}" data-index="${i}">

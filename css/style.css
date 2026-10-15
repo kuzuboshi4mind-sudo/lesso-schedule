@@ -294,7 +294,8 @@ body {
    iPad はどちらの向きでも当てはまらないので、今までどおり */
 @media (max-width: 600px), (max-height: 500px) {
   /* 行は低く、列は広く(名前が読めるように) */
-  :root { --row-base: 18px; --day-base: 72px; }
+  :root { --row-base: 18px; --day-base: 36px; }
+  .calendar { font-size: calc(11px * var(--zf)); }
   /* 30分以下の予定は、名前を1行にして収める */
   .lesson.half { padding-top: 0; padding-bottom: 0; }
   .lesson.half .lesson-name { white-space: nowrap; text-overflow: ellipsis; }
@@ -1084,3 +1085,148 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
 .student-sent { margin: 0 0 10px; }
 .tentative-list .sent-mark { white-space: nowrap; }
 #student-line { margin: 0 0 16px; }
+
+/* =========================================================
+   Numbers 風の見た目(2026-10-16)
+   今まで使っていた Numbers の表に近づける:
+   ・日付の行は青紫に白い字、「予定」の行はオレンジ、空いたマスは30分ごとに白と薄い灰色のしま
+   ・予定はマスいっぱいに平らに塗り、黒い字。確約は赤い○、キャンセルは赤い×、仮は印なし
+   ・自分の予定(なし)は塗らずに小さな字
+   ========================================================= */
+:root {
+  --nb-head: #8e9bf5;          /* 日付の行(青紫) */
+  --nb-head-text: #ffffff;
+  --nb-zebra: #f2f2f1;         /* しま(:30 の行) */
+  --nb-off: #d6f1fd;           /* 土日・祝日の列 */
+  --nb-off-zebra: #c9e9f8;
+  --nb-today: #fff6c4;
+  --nb-today-zebra: #fbefb0;
+  --nb-grid: #e3e3e3;          /* 罫線 */
+  --nb-memo: linear-gradient(180deg, #ffc165, #ed620e);   /* 「予定」の行 */
+  --nb-memo-text: #3b1d00;
+  --nb-cell-text: #1a1a1a;     /* 塗ったマスの文字 */
+  --nb-red: #e8382c;           /* ○ と × */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nb-head: #4b56a8;
+    --nb-zebra: #1b2625;
+    --nb-off: #13303d;
+    --nb-off-zebra: #183846;
+    --nb-today: #3a3412;
+    --nb-today-zebra: #433c15;
+    --nb-grid: #2b3b39;
+    --nb-red: #ff5b4f;
+  }
+}
+
+.calendar { font-family: "Helvetica Neue", -apple-system, "Hiragino Sans", sans-serif; }
+.calendar th, .calendar td { border-right-color: var(--nb-grid); border-bottom-color: var(--nb-grid); }
+.calendar tbody tr:not(.hour) td,
+.calendar tbody tr:not(.hour) .time-col { border-bottom-color: var(--nb-grid); }
+
+/* 日付の行:青紫に白い太字 */
+.calendar thead .row-date th,
+.calendar thead .row-date th.off,
+.calendar thead .row-date th.sun,
+.calendar thead .row-date th.sat { background: var(--nb-head); color: var(--nb-head-text); }
+.calendar thead .row-date th.today { background: #f6d84a; color: #1a1a1a; }
+/* 曜日の行:白。日曜・祝日は赤 */
+.calendar thead .row-week th,
+.calendar thead .row-week th.off { background: var(--surface); color: var(--text); }
+.calendar thead .row-week th.sun { color: var(--sun); }
+.calendar .row-week th.sat { color: var(--text); }
+.calendar thead .row-week th.today { background: var(--nb-today); }
+/* 「予定」の行:オレンジ */
+.calendar thead .row-memo th,
+.calendar thead .row-memo th.off,
+.calendar thead .row-memo th.today { background: var(--nb-memo); color: var(--nb-memo-text); }
+.calendar .row-memo .day-note { color: var(--nb-memo-text); font-weight: 600; }
+.calendar .row-memo .holiday-name { color: #8a1200; }
+.calendar thead .row-memo th.time-col { background: var(--surface); color: var(--muted); }
+/* 時刻の列:白地に灰色の字 */
+.calendar tbody .time-col,
+.calendar tbody tr.hour .time-col { background: var(--surface); color: #555; font-weight: 500; }
+.calendar thead .row-date .time-col { background: var(--nb-head); color: var(--nb-head-text); }
+
+/* 空いたマス:30分ごとのしま。土日祝は水色、今日は黄色 */
+.calendar tbody td { background: var(--surface); }
+.calendar tbody tr:not(.hour) td { background: var(--nb-zebra); }
+.calendar tbody td.off { background: var(--nb-off); }
+.calendar tbody tr:not(.hour) td.off { background: var(--nb-off-zebra); }
+.calendar tbody td.today { background: var(--nb-today); }
+.calendar tbody tr:not(.hour) td.today { background: var(--nb-today-zebra); }
+
+/* 予定:マスいっぱいに平らに塗る(角丸・すき間・影なし) */
+.calendar .lesson,
+.legend-lesson.lesson {
+  top: calc(var(--offset) / 30 * var(--row));
+  height: calc(var(--dur) / 30 * var(--row));
+  padding: 0 2px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  justify-content: flex-start;
+  color: var(--nb-cell-text);
+  line-height: var(--row);
+  font-weight: 600;
+}
+.calendar .lesson.confirmed,
+.calendar .lesson.tentative,
+.calendar .lesson.cancelled { background: var(--type-color); color: var(--nb-cell-text); }
+/* 30分ごとの行に1行ずつ。はみ出た文字は切る(折り返さない) */
+.calendar .lesson .lesson-name,
+.calendar .lesson .lesson-line {
+  display: block;
+  flex: none;
+  width: 100%;
+  height: var(--row);
+  line-height: var(--row);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  text-decoration: none;
+  font-weight: 600;
+}
+.calendar .lesson .lesson-line { font-weight: 500; }
+/* 仮:印なし。細い点線で囲んで、確約と見分けやすく */
+.calendar .lesson.tentative { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.calendar .lesson.tentative .lesson-name { font-weight: 600; }
+@supports (outline-style: dashed) {
+  .calendar .lesson.tentative { box-shadow: none; outline: 1px dashed rgba(0, 0, 0, 0.45); outline-offset: -2px; }
+}
+/* キャンセル:色を薄く、赤い × */
+.calendar .lesson.cancelled { opacity: 0.55; }
+/* 自分の予定:塗らずに小さな字 */
+.calendar .lesson.none {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.78em;
+  font-weight: 400;
+}
+.calendar .lesson.none .lesson-name,
+.calendar .lesson.none .lesson-line { font-weight: 400; }
+/* 赤い ○(確約)と × (キャンセル) */
+.lesson-mark.ok {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-left: 1px;
+  border: 0.16em solid var(--nb-red);
+  border-radius: 50%;
+  vertical-align: -0.08em;
+  box-sizing: border-box;
+}
+.lesson-mark.ng { color: var(--nb-red); font-weight: 900; margin-left: 1px; }
+.lesson .lesson-memo-mark, .lesson .lesson-repeat-mark { font-size: 0.7em; opacity: 0.7; }
+/* 15分・20分(1マスの半分) */
+.calendar .lesson.short { font-size: 0.8em; }
+.calendar .lesson.short .lesson-name { height: 100%; line-height: calc(var(--dur) / 30 * var(--row)); }
+.calendar .lesson.fill .lesson-name { font-size: 1em; }
+.lesson-short-dur { font-size: 0.65em; font-weight: 500; margin-left: 1px; opacity: 0.8; }
+/* 上の帯の見本も同じ見た目に */
+.legend-lesson.lesson { height: 20px; line-height: 20px; color: #1a1a1a; }
+.legend-lesson.lesson.tentative { outline: 1px dashed rgba(0, 0, 0, 0.45); outline-offset: -2px; background: var(--type-color); }
+.legend-lesson.lesson.cancelled { background: var(--type-color); opacity: 0.55; }
+.legend-lesson.lesson.none { background: transparent; font-weight: 400; }

@@ -6,15 +6,17 @@
 // ・Mac:⌘ を押しながらスクロール(またはトラックパッドのピンチ)で拡大・縮小
 // 大きさは端末ごとに覚えておく(次に開いたときも同じ大きさ)
 
-const BASE = { timeCol: 56, headRows: 34 + 26 + 40, rows: 36 };
+const BASE = { timeCol: 56, headRows: 34 + 26 + 40 };
+// 時刻の行の数(ふだんは 8:00〜23:30 の32行。8時前に予定がある月は増える)
+const rowCount = () => table.querySelectorAll('tbody tr').length || 32;
 // 30分の行の高さと日付の列の幅(拡大率1のとき)。スマホでは変わるので、CSS の --row-base / --day-base から読む
 const cssPx = (name, fallback) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
 const baseRow = () => cssPx('--row-base', 34);
 const baseDay = () => cssPx('--day-base', 58);
 // スマホ(幅がせまい、または横向きで高さが低い画面)かどうか。CSS の @media と同じ条件
 const phoneQuery = window.matchMedia('(max-width: 600px), (max-height: 500px)');
-const PHONE_MIN_DAY = 54;     // スマホで日付の列をこれより細くしない(px。名前が3〜4文字読める幅)
-const PHONE_MIN_FONT = 0.9;   // スマホで文字をこれより小さくしない(元の大きさに対する倍率)
+const PHONE_MIN_DAY = 30;     // スマホで日付の列をこれより細くしない(px。名前は折り返さず、はみ出た分は切る)
+const PHONE_MIN_FONT = 0.8;   // スマホで文字をこれより小さくしない(元の大きさに対する倍率)
 const MAX = 1.8;            // いちばん大きくしたとき(元の1.8倍)
 const SAVE_KEY = 'lesso.zoom';
 
@@ -29,6 +31,8 @@ export function initZoom(opts) {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
     if (saved) ({ zx, zy } = saved);
   } catch { /* 読めなければ元の大きさ */ }
+  // スマホは開いた瞬間に1日(8:00〜24:00)が縦に全部見える大きさにする(横は元の幅)
+  if (phoneQuery.matches) { zx = 1; zy = 0; }
 
   scroller.addEventListener('touchstart', onTouchStart, { passive: true });
   scroller.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -60,7 +64,7 @@ function fitScale() {
     const zf = fontScale(fx, fy);
     const timeCol = BASE.timeCol * Math.max(zf, 0.8);
     fx = (w - timeCol - 4) / (days * baseDay());
-    fy = (h - BASE.headRows * zf - 4) / (BASE.rows * baseRow());
+    fy = (h - BASE.headRows * zf - 4) / (rowCount() * baseRow());
   }
   // スマホは1か月を横に全部入れると文字が読めないので、列の幅に下限をつける(残りは横スクロール)
   if (phoneQuery.matches) fx = Math.max(fx, PHONE_MIN_DAY / baseDay());

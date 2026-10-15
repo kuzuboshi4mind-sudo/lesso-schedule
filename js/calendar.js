@@ -104,9 +104,10 @@ function layoutLanes(lessons) {
 
 const STATUS_LABEL = { tentative: '仮', confirmed: '確約', cancelled: 'キャンセル', none: '' };
 
-// レッスン1件のブロック(マスの中に重ねて表示する色付きの帯)
-// 確約=濃い色+○、仮=薄い色、キャンセル=灰色+×、なし(自分の予定)=左に色の線
-function lessonBlock(lesson, type, pos) {
+// レッスン1件のブロック(Numbers と同じく、マスいっぱいに種類の色で塗る)
+// 確約=名前のあとに赤い○、仮=印なし(細い点線)、キャンセル=赤い×、なし(自分の予定)=塗らずに小さな字
+// 30分ごとの行に1行ずつ文字を入れる:1行目=名前と印、2行目=長さ(15分・45分・〜18:30 など。30分単位なら名前)、3行目から=名前
+function lessonBlock(lesson, type, pos, solo = false) {
   const offset = toMinutes(lesson.start) % 30;      // マスの上端から何分ずれているか
   const color = type ? type.color : '#9e9e9e';
   const status = lesson.status || 'tentative';
@@ -115,37 +116,58 @@ function lessonBlock(lesson, type, pos) {
   const repeatMark = lesson.recurring ? '<span class="lesson-repeat-mark" title="毎週の固定枠">↻</span>' : '';
   // 長さの表示:30分は省略、2時間を超える予定は終了時刻
   const end = fromMinutes(toMinutes(lesson.start) + lesson.duration);
-  const durationLabel = lesson.duration > 120 ? `<span class="lesson-dur">〜${end}</span>`
-    : lesson.duration !== 30 ? `<span class="lesson-dur">${lesson.duration}分</span>` : '';
   const name = escapeHtml(lesson.student || '(名前なし)');
-  const label = status === 'confirmed' ? `${name}<span class="lesson-mark">○</span>`
-    : status === 'cancelled' ? `<span class="lesson-mark">×</span>${name}`
+  const label = status === 'confirmed' ? `${name}<span class="lesson-mark ok" aria-label="確約"></span>`
+    : status === 'cancelled' ? `${name}<span class="lesson-mark ng" aria-label="キャンセル">✕</span>`
     : name;
+  // 15分・20分の予定が1マスに1件だけのときは、Numbers のようにマスいっぱいに塗り、長さを小さく添える
+  const fill = solo && lesson.duration < 30;
+  const shortDur = fill ? `<small class="lesson-short-dur">${lesson.duration}</small>` : '';
+  // 2行目以降(30分ごと)
+  const rows = fill ? 1 : Math.max(1, Math.ceil((offset + lesson.duration) / 30));
+  const extra = [];
+  for (let i = 1; i < rows; i++) {
+    const text = i === 1 && lesson.duration % 30 !== 0 ? `${lesson.duration}分`
+      : i === 1 && lesson.duration > 120 ? `〜${end}` : name;
+    extra.push(`<span class="lesson-line">${text}</span>`);
+  }
   const tip = `${STATUS_LABEL[status] ?? ''} ${lesson.start}〜${end}(${lesson.duration}分) ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
   // 文字色は確約(濃い色の上)だけ背景に合わせて決める。仮・キャンセルは CSS で決める
-  const textColor = status === 'confirmed' ? `color:${textColorFor(color)};` : '';
-  return `<button type="button" class="lesson ${status}${lesson.duration <= 20 ? ' short' : ''}${lesson.duration <= 30 ? ' half' : ''}" data-id="${escapeHtml(lesson.id)}"
+  const textColor = '';
+  return `<button type="button" class="lesson ${status}${fill ? ' fill' : lesson.duration <= 20 ? ' short' : ''}${lesson.duration <= 30 ? ' half' : ''}" data-id="${escapeHtml(lesson.id)}"
     title="${escapeHtml(tip)}"
-    style="--offset:${offset};--dur:${lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
-    <span class="lesson-name">${label}</span>${durationLabel}${memoMark}${repeatMark}
+    style="--offset:${fill ? 0 : offset};--dur:${fill ? 30 : lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
+    <span class="lesson-name">${label}${shortDur}</span>${extra.join('')}${memoMark}${repeatMark}
   </button>`;
 }
 
 // 表の中身を作って table 要素に入れる
 // data = { lessons:[...], dayNotes:{日付:文字}, types:[...] }
+// 表はふだん 8:00 から(Numbers と同じ)。8時より前に予定がある月だけ、その時刻から出す
+export const DISPLAY_START_HOUR = 8;
+
 export function renderCalendar(table, year, month, data = {}) {
   const { lessons = [], dayNotes = {}, types = [] } = data;
+  const earliest = Math.min(DISPLAY_START_HOUR * 60, ...lessons.map(l => toMinutes(l.start)));
+  const firstSlot = `${Math.floor(earliest / 60)}:${earliest % 60 >= 30 ? '30' : '00'}`;
   const days = monthDays(year, month);
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
 
   // レッスンを「日付|30分のマスの時刻」ごとに分けておく
   const lanesByDate = {};
   for (const d of days) lanesByDate[d.key] = layoutLanes(lessons.filter(l => l.date === d.key));
-  const blocksBySlot = {};
+  const bySlot = {};
   for (const l of lessons) {
     const slot = fromMinutes(Math.floor(toMinutes(l.start) / 30) * 30);
-    const k = `${l.date}|${slot}`;
-    (blocksBySlot[k] ||= []).push(lessonBlock(l, typeById[l.typeId], lanesByDate[l.date].get(l.id)));
+    (bySlot[`${l.date}|${slot}`] ||= []).push(l);
+  }
+  const blocksBySlot = {};
+  for (const [k, list] of Object.entries(bySlot)) {
+    // そのマスに予定が1件だけで、横に並ぶ予定もない(=マスを独り占めできる)
+    blocksBySlot[k] = list.map(l => {
+      const pos = lanesByDate[l.date].get(l.id);
+      return lessonBlock(l, typeById[l.typeId], pos, list.length === 1 && pos.lanes === 1);
+    });
   }
 
   const dateRow = days.map(d =>
@@ -159,7 +181,8 @@ export function renderCalendar(table, year, month, data = {}) {
     return `<th class="day-memo ${colClass(d)}" data-date="${d.key}">${holiday}${note}</th>`;
   }).join('');
 
-  const bodyRows = timeSlots().map(time => {
+  const slots = timeSlots();
+  const bodyRows = slots.slice(Math.max(0, slots.indexOf(firstSlot))).map(time => {
     const cells = days.map(d => {
       const blocks = blocksBySlot[`${d.key}|${time}`];
       return `<td class="${colClass(d)}" data-date="${d.key}" data-time="${time}">${blocks ? `<div class="slot">${blocks.join('')}</div>` : ''}</td>`;

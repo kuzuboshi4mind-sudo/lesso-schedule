@@ -19,17 +19,20 @@ const KEYS = {
 // 種類(場所)の初期値。手順4の設定画面で追加・変更できるようにする
 // countInTotal:集計に入れるかどうか
 const DEFAULT_TYPES = [
-  { id: 'home',     name: '自宅',     color: '#4caf50', countInTotal: true },
-  { id: 'oki-kawaguchi', name: 'OKI川口', color: '#f2c94c', countInTotal: true },
-  { id: 'oki-kamo', name: 'OKI加茂',  color: '#f2994a', countInTotal: true },
-  { id: 'sunpal',   name: 'サンパル', color: '#56ccf2', countInTotal: true },
-  { id: 'visit',    name: '訪問',     color: '#9b51e0', countInTotal: true },
-  { id: 'online',   name: 'オンライン', color: '#2f5fd0', countInTotal: true },
-  { id: 'jinis',    name: 'JINIS',    color: '#f48fb1', countInTotal: true },
-  { id: 'sauna',    name: 'サウナ',   color: '#a1887f', countInTotal: false },
-  { id: 'practice', name: '練習',     color: '#26a69a', countInTotal: false },
-  { id: 'other',    name: 'その他',   color: '#9e9e9e', countInTotal: false },
+  { id: 'home',     name: '自宅',     color: '#ade467', countInTotal: true },
+  { id: 'oki-kawaguchi', name: 'OKI川口', color: '#f0bc00', countInTotal: true },
+  { id: 'oki-kamo', name: 'OKI加茂',  color: '#fe8468', countInTotal: true },
+  { id: 'sunpal',   name: 'サンパル', color: '#3fe8e9', countInTotal: true },
+  { id: 'visit',    name: '訪問',     color: '#5c70f4', countInTotal: true },
+  { id: 'online',   name: 'オンライン', color: '#2bb8ba', countInTotal: true },
+  { id: 'jinis',    name: 'JINIS',    color: '#ffdbd8', countInTotal: true },
+  { id: 'sauna',    name: 'サウナ',   color: '#d7bfae', countInTotal: false },
+  { id: 'practice', name: '練習',     color: '#9edbd2', countInTotal: false },
+  { id: 'other',    name: 'その他',   color: '#d9d9d9', countInTotal: false },
 ];
+
+// Numbers で使っていた色(2026-10-16 から初期値。設定画面の「Numbers と同じ色にする」でも使う)
+export const NUMBERS_COLORS = Object.fromEntries(DEFAULT_TYPES.map(t => [t.id, t.color]));
 
 // 予定の状態。仮=まだ確定していない、確約=確定(○)、キャンセル(×)、
 // なし=レッスン以外の自分の予定(仮・確約の区別がないもの)

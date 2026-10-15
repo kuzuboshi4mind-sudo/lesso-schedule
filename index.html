@@ -59,10 +59,10 @@
       <ul id="type-legend" class="type-legend" aria-label="種類の色"></ul>
       <!-- 状態の見本 -->
       <ul class="status-legend" aria-label="状態の見本">
-        <li><span class="legend-lesson lesson confirmed">名前<span class="lesson-mark">○</span></span>確約</li>
+        <li><span class="legend-lesson lesson confirmed">名前<span class="lesson-mark ok"></span></span>確約</li>
         <li><span class="legend-lesson lesson tentative">名前</span>仮</li>
-        <li><span class="legend-lesson lesson cancelled"><span class="lesson-mark">×</span><span class="lesson-name">名前</span></span>キャンセル</li>
-        <li><span class="legend-lesson lesson none">予定</span>なし</li>
+        <li><span class="legend-lesson lesson cancelled">名前<span class="lesson-mark ng">✕</span></span>キャンセル</li>
+        <li><span class="legend-lesson lesson none">ライブ</span>自分の予定</li>
       </ul>
     </div>
   </header>
@@ -242,6 +242,7 @@
     <section class="settings-section">
       <h3>種類と色</h3>
       <p class="sheet-note">色の丸をタップすると色を選べます。上から順に、入力画面と色の見本に並びます。</p>
+      <button type="button" id="numbers-colors" class="btn">Numbers と同じ色にする</button>
       <ul id="type-list" class="type-list"></ul>
       <button type="button" id="add-type" class="btn">+ 種類を追加</button>
     </section>
