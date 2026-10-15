@@ -1017,3 +1017,59 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
 .line-template summary { min-height: 44px; display: flex; align-items: center; color: var(--muted); cursor: pointer; }
 .line-template textarea { margin-bottom: 8px; }
 .button-row + .sheet-note { margin-top: 10px; }
+
+/* 生徒の一覧のまとまり(連絡が必要 / 返事待ち / 確定済み / 予定なし) */
+.student-group-head {
+  margin: 14px 0 4px;
+  padding: 0 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.student-group-head.todo { color: var(--tentative); }
+.students-list li.student-group { border-top: none; }
+/* 仮の予定がある生徒は、表の「仮」と同じ点線の枠 */
+.student-row.todo, .student-row.waiting {
+  margin: 4px 0;
+  border: 2px dashed var(--tentative);
+  border-radius: 10px;
+  padding: 8px 8px;
+}
+.student-row.waiting { border-color: var(--line-strong); }
+.student-row.none { opacity: 0.6; }
+.student-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: 1px;
+  background: var(--tentative);
+  color: #fff;
+}
+.student-badge.waiting { background: var(--line); color: var(--text); }
+/* 「👤 生徒」ボタンの数字(連絡が必要な人数) */
+#open-students { position: relative; }
+.count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--tentative);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+.count-badge[hidden] { display: none; }
+/* 生徒の画面:LINE で送った印 */
+.student-sent { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; font-size: 0.9rem; color: var(--muted); }
+/* LINE の画面:送り先 */
+.line-to { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, #06c755 12%, var(--surface)); font-size: 1.05rem; }
+.line-to strong { font-size: 1.25rem; }
+.line-to.unset { background: var(--memo); color: var(--muted); font-size: 0.9rem; }

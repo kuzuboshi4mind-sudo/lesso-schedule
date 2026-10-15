@@ -3,8 +3,10 @@
 // ・その生徒の予定(仮だけ / 仮と確約)から文面を自動で作り、「LINE を開く」で LINE の「送信先を選択」画面を開く
 //   (LINE の公式のしくみ https://line.me/R/share?text=文面 を使う。自動では送らない。送る相手は LINE で選ぶ)
 // ・文面はひな形({名前}{期間}{予定})から作る。ひな形は変えて保存できる(どの端末でも同じ)
+// ・生徒メモで「LINE での名前」を登録しておくと、「送り先」として大きく出す(LINE の画面で迷わず選べるように)
+// ・「LINE を開く」を押すと、文面に入れた予定に「送った印」を付ける(生徒の一覧で「返事待ち」になる)
 import * as store from './store.js';
-import { toMinutes, fromMinutes } from './calendar.js';
+import { toMinutes, fromMinutes, escapeHtml } from './calendar.js';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -17,9 +19,12 @@ const count = document.getElementById('line-count');
 const openLink = document.getElementById('line-open');
 const copyBtn = document.getElementById('line-copy');
 const template = document.getElementById('line-template');
+const to = document.getElementById('line-to');
 
 let student = '';
 let types = [];
+let current = [];          // いまの文面に入っている予定
+let onSent = () => {};
 
 export function initLineShare() {
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
@@ -27,6 +32,13 @@ export function initLineShare() {
   statusSel.addEventListener('change', build);
   text.addEventListener('input', updateLink);
   copyBtn.addEventListener('click', copyText);
+  // LINE を開いたら、送った印を付ける(リンクはそのまま LINE を開く)
+  openLink.addEventListener('click', async () => {
+    if (openLink.getAttribute('aria-disabled') === 'true' || !current.length) return;
+    await store.markLineSent(student, current);
+    await onSent();
+    count.textContent = `${current.length}件の予定に「送った印」を付けました。`;
+  });
   document.getElementById('line-template-save').addEventListener('click', async () => {
     await store.saveLineTemplate(template.value);
     await build();
@@ -70,10 +82,17 @@ function rangeOptions() {
 }
 
 // その生徒の画面から開く
-export async function openLineShare(name) {
+export async function openLineShare(name, opts = {}) {
   student = name;
-  types = await store.getTypes();
+  onSent = opts.onSent || (() => {});
+  const [t, extras] = await Promise.all([store.getTypes(), store.getStudentExtras()]);
+  types = t;
   title.textContent = `${name}さんに LINE で送る`;
+  const lineName = extras[name]?.lineName;
+  to.classList.toggle('unset', !lineName);
+  to.innerHTML = lineName
+    ? `送り先:<strong>${escapeHtml(lineName)}</strong>(LINE の画面でこの人を選んでください)`
+    : '送り先の LINE での名前が未登録です。生徒の画面の「LINE での名前」に入れておくと、ここに出ます。';
   const options = rangeOptions();
   range.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
   statusSel.value = 'tentative';
@@ -98,6 +117,7 @@ async function pickLessons(option) {
 async function build() {
   const option = rangeOptions().find(o => o.value === range.value);
   const lessons = await pickLessons(option);
+  current = lessons;
   const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
   const both = statusSel.value === 'both';
   const lines = lessons.map(l => {

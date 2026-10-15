@@ -501,9 +501,9 @@ const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
 // 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
 export async function buildBackup(year, month) {
   const [from, to] = year ? monthRange(year, month) : ['0000-01-01', '9999-12-31'];
-  const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents, tentativeMonths] = await Promise.all([
+  const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents, tentativeMonths, studentExtras] = await Promise.all([
     db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
-    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'), db.listStudents(), getHiddenStudents(), db.listMonths(),
+    db.listSlots(), db.listExceptions('0000-01-01', '9999-12-31'), db.listStudents(), getHiddenStudents(), db.listMonths(), getStudentExtras(),
   ]);
   const months = year
     ? [`${year}-${String(month).padStart(2, '0')}`]
@@ -513,7 +513,7 @@ export async function buildBackup(year, month) {
     exportedAt: new Date().toISOString(),
     lessons: lessons.map(({ deletedAt, ...l }) => l),
     dayNotes,
-    settings: { types, durationRules, hiddenStudents },
+    settings: { types, durationRules, hiddenStudents, studentExtras },
     recurring: { slots, exceptions },   // 毎週の固定枠(どの月の書き出しにも全部入れる)
     students,                           // 生徒メモ(どの月の書き出しにも全部入れる)
     tentativeMonths: months.filter(ym => tentativeMonths[ym]),   // 仮の月
@@ -620,6 +620,7 @@ export async function restoreBackup(data, { withSettings = false } = {}) {
     if (data.settings.types) await saveTypes(data.settings.types);
     if (data.settings.durationRules) await saveDurationRules(data.settings.durationRules);
     if (data.settings.hiddenStudents) await db.setSetting('hiddenStudents', data.settings.hiddenStudents);
+    if (data.settings.studentExtras) await db.setSetting('studentExtras', data.settings.studentExtras);
   }
   return { lessons: data.lessons.length, changed: lessonChanges.length + noteChanges.length };
 }
@@ -684,8 +685,9 @@ export async function getStudents() {
 export async function getStudentOverview() {
   const today = localToday();
   const from = addDays(today, -180), to = addDays(today, 92);
-  const [students, allLessons, occurrences, allSlots, types, hidden] = await Promise.all([
+  const [students, allLessons, occurrences, allSlots, types, hidden, extras] = await Promise.all([
     db.listStudents(), db.listLessons(from, to), getOccurrences(today, to), db.listSlots(), getTypes(), getHiddenStudents(),
+    getStudentExtras(),
   ]);
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
   const hiddenSet = new Set(hidden);
@@ -693,7 +695,13 @@ export async function getStudentOverview() {
   const slots = allSlots.filter(sl => isLessonLike(sl, typeById) && !hiddenSet.has(sl.student));
   const byName = new Map();
   const entry = name => {
-    if (!byName.has(name)) byName.set(name, { name, id: null, memo: '', typeId: null, next: null, slots: [], count: 0, lastDate: '' });
+    if (!byName.has(name)) {
+      const x = extras[name] || {};
+      byName.set(name, {
+        name, id: null, memo: '', typeId: null, next: null, slots: [], count: 0, lastDate: '',
+        lineName: x.lineName || '', sentAt: x.sentAt || null, tentative: [], unsent: [],
+      });
+    }
     return byName.get(name);
   };
   for (const s of students) if (!hiddenSet.has(s.name)) Object.assign(entry(s.name), { id: s.id, memo: s.memo || '' });
@@ -711,12 +719,56 @@ export async function getStudentOverview() {
       e.next = { date: l.date, start: l.start };
     }
     if (l.date >= today && status !== 'cancelled') e.count++;
+    if (l.date >= today && status === 'tentative') e.tentative.push(l);
   }
   for (const sl of activeSlots) {
     const e = byName.get(sl.student);
     if (e && !e.typeId) e.typeId = sl.typeId;
   }
+  // まとまり:todo=仮の予定があり、まだ LINE で送っていないものがある / waiting=仮の予定は全部送った(返事待ち)
+  //          confirmed=これからの予定は全部確約 / none=これからの予定なし
+  for (const e of byName.values()) {
+    const sent = new Set((extras[e.name]?.sent || []).map(x => x.id));
+    e.unsent = e.tentative.filter(l => !sent.has(l.id));
+    e.group = e.tentative.length ? (e.unsent.length ? 'todo' : 'waiting') : e.count ? 'confirmed' : 'none';
+  }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+}
+
+// 「仮の予定があって、まだ LINE で送っていない」生徒の人数(上の「👤 生徒」ボタンの数字)
+export async function countStudentsToContact() {
+  return (await getStudentOverview()).filter(e => e.group === 'todo').length;
+}
+
+// ---- 生徒ごとの LINE の情報 ----
+// { 名前: { lineName:'LINE での名前', sentAt:'送った日時', sent:[{ id:予定のid, date }] } }(設定の studentExtras)
+export async function getStudentExtras() {
+  return (await db.getSetting('studentExtras')) || {};
+}
+
+// 名前の分の情報を書き換える変更(commit に入れる形)。patch が null なら消す
+async function extrasChange(name, patch) {
+  const before = await getStudentExtras();
+  const after = { ...before };
+  if (patch === null) delete after[name];
+  else after[name] = { ...(before[name] || {}), ...patch };
+  return { key: 'studentExtras', before, after };
+}
+
+// LINE で送った予定を記録する(「LINE を開く」を押したとき)。過ぎた日の記録は消して軽くする
+export async function markLineSent(name, lessons) {
+  const today = localToday();
+  const old = ((await getStudentExtras())[name]?.sent || []).filter(x => x.date >= today);
+  const ids = new Set(old.map(x => x.id));
+  const sent = old.concat(lessons.filter(l => !ids.has(l.id)).map(l => ({ id: l.id, date: l.date })));
+  const change = await extrasChange(name, { sentAt: new Date().toISOString(), sent });
+  await commit({ label: `${name}さんに LINE で送った印`, settings: [change] });
+}
+
+// 送った印を外す
+export async function clearLineSent(name) {
+  const change = await extrasChange(name, { sentAt: null, sent: [] });
+  await commit({ label: `${name}さんの LINE で送った印を外す`, settings: [change] });
 }
 
 // その生徒のこれからの予定(今日から3か月。固定枠から入る予定も含む)
@@ -730,7 +782,7 @@ export async function getUpcomingLessons(name) {
 }
 
 // 生徒メモを保存する(id がなければ新しく作る)。同じ名前の生徒がいればその人のメモにする
-export async function saveStudent({ id, name, memo }) {
+export async function saveStudent({ id, name, memo, lineName }) {
   name = name.trim();
   if (!name) throw new Error('名前を入れてください');
   const current = await db.listStudents();
@@ -739,6 +791,10 @@ export async function saveStudent({ id, name, memo }) {
   const hidden = await getHiddenStudents();
   // 削除した生徒と同じ名前で追加したときは、一覧に戻す
   const settings = hidden.includes(name) ? [{ key: 'hiddenStudents', before: hidden, after: hidden.filter(n => n !== name) }] : [];
+  // LINE での名前(送り先)
+  if (lineName !== undefined && ((await getStudentExtras())[name]?.lineName || '') !== lineName.trim()) {
+    settings.push(await extrasChange(name, { lineName: lineName.trim() }));
+  }
   if (before && before.name === after.name && before.memo === after.memo && !settings.length) return after;
   await commit({ label: `${name}さんの生徒メモ`, students: [{ before, after }], settings });
   return after;
@@ -778,9 +834,17 @@ export async function renameStudent(oldName, newName) {
   } else if (from) {
     studentChanges.push({ before: from, after: { ...from, name: newName, updatedAt: now } });
   }
+  // LINE の情報も新しい名前に移す
+  const settings = [];
+  const extras = await getStudentExtras();
+  if (extras[oldName]) {
+    const after = { ...extras, [newName]: { ...extras[oldName], ...(extras[newName] || {}) } };
+    delete after[oldName];
+    settings.push({ key: 'studentExtras', before: extras, after });
+  }
   await commit({
     label: `名前の変更(${oldName} → ${newName})`,
-    lessons: lessonChanges, slots: slotChanges, students: studentChanges,
+    lessons: lessonChanges, slots: slotChanges, students: studentChanges, settings,
   });
   return lessonChanges.length + slotChanges.length;
 }

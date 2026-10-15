@@ -19,7 +19,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '手順12(2026-10-15)';
+const APP_VERSION = '生徒の一覧と LINE の送り先(2026-10-15)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -52,6 +52,7 @@ async function show({ keepScroll = false } = {}) {
     store.isTentativeMonth(year, month),
   ]);
   showMonthStatus(tentative);
+  updateStudentsBadge();
   dayNotes = notes;
   const { scrollLeft, scrollTop } = scroller;
   renderCalendar(table, year, month, { lessons, dayNotes, types });
@@ -65,6 +66,16 @@ async function show({ keepScroll = false } = {}) {
   } else {
     scrollToToday();
   }
+}
+
+// 「👤 生徒」ボタンの数字:仮の予定があって、まだ LINE で送っていない生徒の人数(表を描くのを待たせないよう後ろで数える)
+const studentsBadge = document.getElementById('students-badge');
+function updateStudentsBadge() {
+  store.countStudentsToContact().then(n => {
+    studentsBadge.hidden = !n;
+    studentsBadge.textContent = n;
+    studentsBadge.title = `連絡が必要な生徒 ${n}人`;
+  }).catch(() => { studentsBadge.hidden = true; });
 }
 
 // 仮の月:月の名前の横の印を「仮」に、表の見出しをオレンジの点線で囲む

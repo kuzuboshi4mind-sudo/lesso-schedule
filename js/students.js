@@ -6,6 +6,7 @@
 // ・「なし(自分の予定)」や集計に入れない種類の予定の名前は、生徒として並べない
 // ・予定の入力画面では、名前の下にその生徒のメモが出る
 // ・「LINE で予定を送る」で、その生徒の予定の文面を作って LINE を開く(js/line-share.js)
+// ・一覧は「連絡が必要(仮の予定をまだ送っていない)」「返事待ち(送った)」「確定済み」「これからの予定なし」に分ける
 import * as store from './store.js';
 import { escapeHtml } from './calendar.js';
 import { openLineShare } from './line-share.js';
@@ -26,6 +27,8 @@ const f = {
   name: document.getElementById('student-name'),
   nameHelp: document.getElementById('student-name-help'),
   memo: document.getElementById('student-memo'),
+  lineName: document.getElementById('student-line-name'),
+  sent: document.getElementById('student-sent'),
   info: document.getElementById('student-info'),
   del: document.getElementById('student-delete'),
   line: document.getElementById('student-line'),
@@ -58,7 +61,12 @@ export function initStudents(opts) {
   }
   form.addEventListener('submit', onSave);
   f.del.addEventListener('click', onDelete);
-  f.line.addEventListener('click', () => openLineShare(editing.name));
+  f.line.addEventListener('click', () => openLineShare(editing.name, { onSent: refreshAfterSend }));
+  f.sent.addEventListener('click', async e => {
+    if (!e.target.closest('[data-clear-sent]')) return;
+    await store.clearLineSent(editing.name);
+    await refreshAfterSend();
+  });
   // Mac:⌘S / ⌘return で保存
   form.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); form.requestSubmit(); }
@@ -94,22 +102,65 @@ function renderList() {
     return;
   }
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
-  list.innerHTML = hits.map(s => {
+  const row = s => {
     const type = typeById[s.typeId];
     const slots = s.slots.map(sl => `↻ ${escapeHtml(store.slotLabel(sl))}`).join('　');
     const next = s.next ? `次:${dateLabel(s.next.date)} ${s.next.start}` : '';
+    const badge = s.group === 'todo'
+      ? `<span class="student-badge">未送信 ${s.unsent.length}件</span>`
+      : s.group === 'waiting'
+        ? `<span class="student-badge waiting">送信済み ${sentLabel(s.sentAt)}・仮 ${s.tentative.length}件</span>`
+        : '';
     return `<li>
-      <button type="button" class="student-row" data-name="${escapeHtml(s.name)}">
+      <button type="button" class="student-row ${s.group}" data-name="${escapeHtml(s.name)}">
         <span class="slot-swatch" style="background:${type?.color || 'transparent'}"></span>
         <span class="student-main">
-          <strong>${escapeHtml(s.name)}</strong>
+          <strong>${escapeHtml(s.name)}${badge}</strong>
           <small>${[type ? escapeHtml(type.name) : '', next, slots].filter(Boolean).join('・')}</small>
           ${s.memo ? `<span class="student-memo-preview">${escapeHtml(s.memo)}</span>` : ''}
         </span>
         <span class="student-arrow" aria-hidden="true">›</span>
       </button>
     </li>`;
+  };
+  list.innerHTML = GROUPS.map(g => {
+    const members = hits.filter(s => s.group === g.id);
+    if (!members.length) return '';
+    return `<li class="student-group"><h3 class="student-group-head ${g.id}">${g.label}(${members.length}人)</h3></li>${members.map(row).join('')}`;
   }).join('');
+}
+
+// 一覧のまとまり(上から順に並べる)
+const GROUPS = [
+  { id: 'todo', label: '連絡が必要:仮の予定をまだ LINE で送っていない' },
+  { id: 'waiting', label: '返事待ち:仮の予定を LINE で送った' },
+  { id: 'confirmed', label: '確定済み:これからの予定は全部確約' },
+  { id: 'none', label: 'これからの予定なし' },
+];
+
+function sentLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+// LINE で送ったあと・印を外したあと:一覧と、開いている生徒の画面を新しくする
+async function refreshAfterSend() {
+  await loadList();
+  const fresh = overview.find(s => s.name === editing?.name);
+  if (fresh && dialog.open) { editing = { ...fresh, memo: editing.memo }; renderSent(); }
+  onChanged();
+}
+
+// 生徒の画面の「LINE で送った印」
+function renderSent() {
+  const s = editing;
+  if (!s?.name || !s.tentative?.length) { f.sent.hidden = true; return; }
+  f.sent.hidden = false;
+  f.sent.innerHTML = s.unsent.length
+    ? `<span>仮の予定 ${s.tentative.length}件のうち、<strong>${s.unsent.length}件をまだ LINE で送っていません</strong></span>`
+    : `<span>仮の予定 ${s.tentative.length}件を LINE で送りました(${sentLabel(s.sentAt)})。返事待ち</span>
+       <button type="button" class="btn btn-small" data-clear-sent>送った印を外す</button>`;
 }
 
 function renderHidden() {
@@ -139,6 +190,8 @@ async function openStudent(student) {
   f.name.value = editing.name;
   f.nameHelp.hidden = isNew;
   f.memo.value = editing.memo;
+  f.lineName.value = editing.lineName || '';
+  renderSent();
   f.error.textContent = '';
   f.del.hidden = isNew;
   f.line.hidden = isNew;
@@ -166,15 +219,17 @@ async function onSave(e) {
   e.preventDefault();
   const name = f.name.value.trim();
   const memo = f.memo.value.trim();
+  const lineName = f.lineName.value.trim();
   if (!name) { f.error.textContent = '名前を入れてください'; return; }
   try {
     if (editing.name && name !== editing.name) {
       if (!confirm(`「${editing.name}」を「${name}」に変えます。この生徒の予定・固定枠の名前もまとめて変わります。よろしいですか?\n(「戻す」で元に戻せます)`)) return;
       await store.renameStudent(editing.name, name);
     }
-    // メモが空で、まだ生徒メモがない人は、何も作らない(予定に名前があれば一覧には出る)
-    if (memo || editing.id) await store.saveStudent({ id: editing.id, name, memo });
-    else if (!editing.name) await store.saveStudent({ name, memo });
+    // メモも LINE での名前も空で、まだ生徒メモがない人は、何も作らない(予定に名前があれば一覧には出る)
+    if (memo || editing.id || !editing.name || lineName !== (editing.lineName || '')) {
+      await store.saveStudent({ id: editing.id, name, memo, lineName });
+    }
   } catch (err) {
     f.error.textContent = `保存できませんでした(${err.message})`;
     return;
