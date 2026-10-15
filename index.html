@@ -317,6 +317,9 @@
         <button type="submit" class="btn btn-primary">保存</button>
       </div>
       <p id="student-error" class="form-error" role="alert"></p>
+      <!-- 仮の予定(返事が来たらチェックして「確定にする」)と LINE で送るボタン。よく使うので一番上に -->
+      <div id="student-sent" class="student-sent" hidden></div>
+      <button type="button" id="student-line" class="btn btn-line">LINE で予定を送る</button>
       <label class="field">
         <span class="field-label">名前</span>
         <input type="text" id="student-name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="例:山田">
@@ -331,8 +334,6 @@
         <span class="field-label">メモ(希望の曜日・時間、注文など)</span>
         <textarea id="student-memo" rows="6" placeholder="例:火・木の17時以降を希望&#10;発表会でショパンを弾きたい"></textarea>
       </label>
-      <button type="button" id="student-line" class="btn btn-line">LINE で予定を送る</button>
-      <div id="student-sent" class="student-sent" hidden></div>
       <div id="student-info" class="student-info"></div>
       <div class="sheet-actions">
         <button type="button" id="student-delete" class="btn btn-danger">この生徒を削除</button>

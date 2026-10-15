@@ -63,9 +63,12 @@ export function initStudents(opts) {
   f.del.addEventListener('click', onDelete);
   f.line.addEventListener('click', () => openLineShare(editing.name, { onSent: refreshAfterSend }));
   f.sent.addEventListener('click', async e => {
-    if (!e.target.closest('[data-clear-sent]')) return;
-    await store.clearLineSent(editing.name);
-    await refreshAfterSend();
+    if (e.target.closest('[data-clear-sent]')) {
+      await store.clearLineSent(editing.name);
+      await refreshAfterSend();
+    } else if (e.target.closest('[data-confirm]')) {
+      await confirmChecked();
+    }
   });
   // Mac:⌘S / ⌘return で保存
   form.addEventListener('keydown', e => {
@@ -148,19 +151,47 @@ function sentLabel(iso) {
 async function refreshAfterSend() {
   await loadList();
   const fresh = overview.find(s => s.name === editing?.name);
-  if (fresh && dialog.open) { editing = { ...fresh, memo: editing.memo }; renderSent(); }
+  if (fresh && dialog.open) {
+    editing = { ...fresh, memo: editing.memo };
+    renderSent();
+    f.info.innerHTML = await infoHtml(editing);
+  }
   onChanged();
 }
 
 // 生徒の画面の「LINE で送った印」
+// 仮の予定の一覧(チェックをつけた予定を「確約」にできる。LINE で送った予定は、はじめからチェック済み)
 function renderSent() {
   const s = editing;
   if (!s?.name || !s.tentative?.length) { f.sent.hidden = true; return; }
   f.sent.hidden = false;
-  f.sent.innerHTML = s.unsent.length
-    ? `<span>仮の予定 ${s.tentative.length}件のうち、<strong>${s.unsent.length}件をまだ LINE で送っていません</strong></span>`
-    : `<span>仮の予定 ${s.tentative.length}件を LINE で送りました(${sentLabel(s.sentAt)})。返事待ち</span>
-       <button type="button" class="btn btn-small" data-clear-sent>送った印を外す</button>`;
+  const unsent = new Set(s.unsent.map(l => l.id));
+  const anySent = s.tentative.some(l => !unsent.has(l.id));
+  const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
+  const sorted = [...s.tentative].sort((a, b) => (a.date + a.start.padStart(5, '0')).localeCompare(b.date + b.start.padStart(5, '0')));
+  const head = s.unsent.length
+    ? `仮の予定 ${s.tentative.length}件(<strong>${s.unsent.length}件はまだ LINE で送っていません</strong>)`
+    : `仮の予定 ${s.tentative.length}件を LINE で送りました(${sentLabel(s.sentAt)})。<strong>返事待ち</strong>`;
+  f.sent.innerHTML = `<p class="sent-head">${head}</p>
+    <ul class="tentative-list">${sorted.map(l => `<li><label>
+      <input type="checkbox" value="${escapeHtml(l.id)}" ${!anySent || !unsent.has(l.id) ? 'checked' : ''}>
+      ${dateLabel(l.date)} ${l.start}〜 ${l.duration}分 ${escapeHtml(typeName[l.typeId] || '')}${l.recurring ? ' ↻' : ''}
+      <span class="sent-mark">${unsent.has(l.id) ? '未送信' : '送信済み'}</span>
+    </label></li>`).join('')}</ul>
+    <div class="button-row">
+      <button type="button" class="btn btn-primary" data-confirm>✓ 返事が来た:チェックした予定を確定にする</button>
+      ${anySent ? '<button type="button" class="btn btn-small" data-clear-sent>送った印を外す</button>' : ''}
+    </div>`;
+}
+
+// チェックした仮の予定を「確約」にする
+async function confirmChecked() {
+  const ids = new Set([...f.sent.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value));
+  const targets = editing.tentative.filter(l => ids.has(l.id));
+  if (!targets.length) { alert('確定にする予定にチェックをつけてください'); return; }
+  const count = await store.confirmLessons(targets);
+  await refreshAfterSend();
+  showToast(`${editing.name}さんの予定 ${count}件を確定にしました(「戻す」で元に戻せます)`);
 }
 
 function renderHidden() {

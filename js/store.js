@@ -883,3 +883,23 @@ export async function getLineTemplate() {
 export async function saveLineTemplate(text) {
   await db.setSetting('lineTemplate', text);
 }
+
+// 返事が来た仮の予定を、まとめて「確約」にする(1回の「戻す」でまとめて元に戻せる)
+// 固定枠から入った予定は、その日だけ確約の予定にする(固定枠そのものは変えない)
+export async function confirmLessons(lessons) {
+  const lessonChanges = [], exceptions = [];
+  for (const l of lessons) {
+    if (isOccurrenceId(l.id)) {
+      const { recurring, slot, ...rest } = l;
+      const after = { ...rest, id: newId(), status: 'confirmed', deletedAt: null };
+      lessonChanges.push({ before: null, after });
+      exceptions.push({ before: null, after: newException(parseOccurrenceId(l.id), 'change', after.id) });
+    } else {
+      const before = (await db.getLessonsByIds([l.id]))[0];
+      if (before && !before.deletedAt) lessonChanges.push({ before, after: { ...before, status: 'confirmed' } });
+    }
+  }
+  if (!lessonChanges.length) return 0;
+  await commit({ label: `確約にする:${nameOf(lessons[0])}(${lessonChanges.length}件)`, lessons: lessonChanges, exceptions });
+  return lessonChanges.length;
+}
