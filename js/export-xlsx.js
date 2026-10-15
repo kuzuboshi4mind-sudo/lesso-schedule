@@ -74,6 +74,10 @@ function durationLabel(l) {
 function lessonStyle(l, type) {
   const color = store.lessonColor(l, type);
   const status = l.status || 'tentative';
+  // 種類「その他」は塗らずに文字だけ(アプリの表と同じ)
+  if (type?.id === 'other') {
+    return { fill: fill('FFFFFFFF'), font: { strike: status === 'cancelled', color: { argb: COLORS.text } } };
+  }
   if (status === 'confirmed') {
     return { fill: fill(argb(color)), font: { bold: true, color: { argb: argb(textColorFor(color)) } } };
   }

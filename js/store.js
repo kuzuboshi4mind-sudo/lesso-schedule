@@ -19,7 +19,7 @@ const KEYS = {
 // 種類(場所)の初期値。手順4の設定画面で追加・変更できるようにする
 // countInTotal:集計に入れるかどうか
 const DEFAULT_TYPES = [
-  { id: 'home',     name: '自宅',     color: '#c9eda0', countInTotal: true },   // 2026-10-16 に少し薄く(元は #ade467)
+  { id: 'home',     name: '自宅',     color: '#bce98a', countInTotal: true },   // 2026-10-16 に少し薄く(元は #ade467。#c9eda0 は薄すぎたので中間)
   { id: 'oki-kawaguchi', name: 'OKI川口', color: '#f0bc00', countInTotal: true },
   { id: 'oki-kamo', name: 'OKI加茂',  color: '#fe8468', countInTotal: true },
   { id: 'sunpal',   name: 'サンパル', color: '#3fe8e9', countInTotal: true },
@@ -80,9 +80,12 @@ export async function getTypes() {
 
 // あとから増えた種類(2026-10-16 の「ライブ」)を、保存済みの種類にも1回だけ足す
 // (一度足したら記録するので、本人が設定で削除したらもう足さない)
-const TYPE_MIGRATIONS = ['live', 'home-softer'];
+const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2'];
 // 色を変える引き継ぎ:保存済みの色がこれまでの初期の色のままなら、新しい色にする(自分で選んだ色は変えない)
-const COLOR_MIGRATIONS = { 'home-softer': { id: 'home', from: ['#ade467', '#4caf50'], to: '#c9eda0' } };
+const COLOR_MIGRATIONS = {
+  'home-softer': { id: 'home', from: ['#ade467', '#4caf50'], to: '#c9eda0' },
+  'home-soft2': { id: 'home', from: ['#c9eda0', '#ade467', '#4caf50'], to: '#bce98a' },
+};
 async function addNewDefaultTypes(saved) {
   const done = (await db.getSetting('typeMigrations')) || [];
   const todo = TYPE_MIGRATIONS.filter(id => !done.includes(id));

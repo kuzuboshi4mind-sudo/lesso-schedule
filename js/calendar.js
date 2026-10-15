@@ -134,7 +134,7 @@ function lessonBlock(lesson, type, pos, solo = false) {
   const tip = `${STATUS_LABEL[status] ?? ''} ${lesson.start}〜${end}(${lesson.duration}分) ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
   // 文字色は確約(濃い色の上)だけ背景に合わせて決める。仮・キャンセルは CSS で決める
   const textColor = '';
-  return `<button type="button" class="lesson ${status}${fill ? ' fill' : lesson.duration <= 20 ? ' short' : ''}${lesson.duration <= 30 ? ' half' : ''}" data-id="${escapeHtml(lesson.id)}"
+  return `<button type="button" class="lesson ${status}${type?.id === 'other' ? ' plain' : ''}${fill ? ' fill' : lesson.duration <= 20 ? ' short' : ''}${lesson.duration <= 30 ? ' half' : ''}" data-id="${escapeHtml(lesson.id)}"
     title="${escapeHtml(tip)}"
     style="--offset:${fill ? 0 : offset};--dur:${fill ? 30 : lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
     <span class="lesson-name">${label}${shortDur}</span>${extra.join('')}${memoMark}${repeatMark}

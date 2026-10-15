@@ -1269,3 +1269,18 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 .calendar .lesson.tentative,
 .legend-lesson.lesson.tentative { background: color-mix(in srgb, var(--type-color) var(--pastel-tentative), #ffffff); }
 .legend-swatch.pastel { background: color-mix(in srgb, var(--type-color) var(--pastel), #ffffff); }
+
+/* 種類「その他」は、二日酔いなどの書き込みと同じく塗らずに文字だけ(状態にかかわらず) */
+.calendar .lesson.plain,
+.calendar .lesson.plain.confirmed,
+.calendar .lesson.plain.tentative,
+.calendar .lesson.plain.cancelled {
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  color: var(--text);
+  font-size: 0.78em;
+  font-weight: 400;
+}
+.calendar .lesson.plain .lesson-name,
+.calendar .lesson.plain .lesson-line { font-weight: 400; }
