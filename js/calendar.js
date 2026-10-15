@@ -105,7 +105,7 @@ function layoutLanes(lessons) {
 const STATUS_LABEL = { tentative: '仮', confirmed: '確約', cancelled: 'キャンセル', none: '' };
 
 // レッスン1件のブロック(Numbers と同じく、マスいっぱいに種類の色で塗る)
-// 確約=名前のあとに赤い○、仮=印なし(細い点線)、キャンセル=赤い×、なし(自分の予定)=塗らずに小さな字
+// 確約=濃い色(印なし)、仮=薄い色+点線、キャンセル=赤い×、なし(自分の予定)=塗らずに小さな字
 // 30分ごとの行に1行ずつ文字を入れる:1行目=名前と印、2行目=長さ(15分・45分・〜18:30 など。30分単位なら名前)、3行目から=名前
 function lessonBlock(lesson, type, pos, solo = false) {
   const offset = toMinutes(lesson.start) % 30;      // マスの上端から何分ずれているか
@@ -117,8 +117,7 @@ function lessonBlock(lesson, type, pos, solo = false) {
   // 長さの表示:30分は省略、2時間を超える予定は終了時刻
   const end = fromMinutes(toMinutes(lesson.start) + lesson.duration);
   const name = escapeHtml(lesson.student || '(名前なし)');
-  const label = status === 'confirmed' ? `${name}<span class="lesson-mark ok" aria-label="確約"></span>`
-    : status === 'cancelled' ? `${name}<span class="lesson-mark ng" aria-label="キャンセル">✕</span>`
+  const label = status === 'cancelled' ? `${name}<span class="lesson-mark ng" aria-label="キャンセル">✕</span>`
     : name;
   // 15分・20分の予定が1マスに1件だけのときは、Numbers のようにマスいっぱいに塗り、長さを小さく添える
   const fill = solo && lesson.duration < 30;
@@ -146,11 +145,13 @@ function lessonBlock(lesson, type, pos, solo = false) {
 // 表はふだん 8:00 から(Numbers と同じ)。8時より前に予定がある月だけ、その時刻から出す
 export const DISPLAY_START_HOUR = 8;
 
+// data.onlyDate を渡すと、その1日だけの表にする(スマホの「1日ビュー」)
 export function renderCalendar(table, year, month, data = {}) {
-  const { lessons = [], dayNotes = {}, types = [] } = data;
+  const { dayNotes = {}, types = [], onlyDate = null } = data;
+  const lessons = onlyDate ? (data.lessons || []).filter(l => l.date === onlyDate) : (data.lessons || []);
   const earliest = Math.min(DISPLAY_START_HOUR * 60, ...lessons.map(l => toMinutes(l.start)));
   const firstSlot = `${Math.floor(earliest / 60)}:${earliest % 60 >= 30 ? '30' : '00'}`;
-  const days = monthDays(year, month);
+  const days = monthDays(year, month).filter(d => !onlyDate || d.key === onlyDate);
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
 
   // レッスンを「日付|30分のマスの時刻」ごとに分けておく

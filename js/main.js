@@ -4,7 +4,7 @@ import * as store from './store.js';
 import { openNewLesson, openExistingLesson, openDayNote, setOnChanged } from './editor.js';
 import { initSelection, afterRender, handleTap, clearSelection } from './selection.js';
 import { initSettings } from './settings.js';
-import { initZoom, refreshZoom } from './zoom.js';
+import { initZoom, refreshZoom, fitDayHeight } from './zoom.js';
 import { requireLogin, watchLogout, logout } from './login.js';
 import { initTrashBackup, showLastBackup } from './trash-backup.js';
 import { initRecurring } from './recurring.js';
@@ -19,12 +19,32 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'Numbers 風の見た目(2026-10-16)';
+const APP_VERSION = '1日ビュー(2026-10-16)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
 let current = readMonthFromUrl() || thisMonth();
 let dayNotes = {};
+
+// 表示のしかた:'month'=月の表、'day'=1日ビュー(スマホは開いた瞬間に1日ビュー。今日の1日を大きく)
+const phoneQuery = window.matchMedia('(max-width: 600px), (max-height: 500px)');
+let viewMode = phoneQuery.matches ? 'day' : 'month';
+let selectedDate = readDayFromUrl() || defaultDay();
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const viewToggle = document.getElementById('view-toggle');
+const thisMonthBtn = document.getElementById('this-month');
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function todayKey() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+// 表示中の月の中で、1日ビューに出す日(今日がその月なら今日、ちがえば1日)
+function defaultDay() {
+  const t = todayKey();
+  return t.startsWith(`${current.year}-${pad(current.month)}`) ? t : `${current.year}-${pad(current.month)}-01`;
+}
+function readDayFromUrl() {
+  const m = location.hash.match(/^#(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  return m ? `${m[1]}-${pad(m[2])}-${pad(m[3])}` : null;
+}
 
 function thisMonth() {
   const now = new Date();
@@ -33,7 +53,7 @@ function thisMonth() {
 
 // URL の末尾(#2026-10 のような部分)から月を読む。再読み込みしても同じ月が出るように
 function readMonthFromUrl() {
-  const m = location.hash.match(/^#(\d{4})-(\d{1,2})$/);
+  const m = location.hash.match(/^#(\d{4})-(\d{1,2})(?:-\d{1,2})?$/);
   if (!m) return null;
   const month = Number(m[2]);
   if (month < 1 || month > 12) return null;
@@ -43,9 +63,16 @@ function readMonthFromUrl() {
 // 表を描き直す(keepScroll:スクロール位置をそのままにする)
 async function show({ keepScroll = false } = {}) {
   const { year, month } = current;
-  title.textContent = `${year}年${month}月`;
+  const dayView = viewMode === 'day';
+  if (dayView && !selectedDate.startsWith(`${year}-${pad(month)}`)) selectedDate = defaultDay();
+  const [, , dd] = selectedDate.split('-').map(Number);
+  title.textContent = dayView ? `${month}月${dd}日(${WEEKDAYS[new Date(year, month - 1, dd).getDay()]})` : `${year}年${month}月`;
   document.title = `${month}月 レッスンスケジュール`;
-  history.replaceState(null, '', `#${year}-${String(month).padStart(2, '0')}`);
+  history.replaceState(null, '', dayView ? `#${selectedDate}` : `#${year}-${pad(month)}`);
+  document.body.classList.toggle('day-view', dayView);
+  viewToggle.hidden = !phoneQuery.matches && !dayView;
+  viewToggle.textContent = dayView ? '月表示' : '1日表示';
+  thisMonthBtn.textContent = dayView ? '今日' : '今月';
 
   const [lessons, notes, types, rules, tentative] = await Promise.all([
     store.getLessons(year, month), store.getDayNotes(year, month), store.getTypes(), store.getDurationRules(),
@@ -55,7 +82,7 @@ async function show({ keepScroll = false } = {}) {
   updateStudentsBadge();
   dayNotes = notes;
   const { scrollLeft, scrollTop } = scroller;
-  renderCalendar(table, year, month, { lessons, dayNotes, types });
+  renderCalendar(table, year, month, { lessons, dayNotes, types, onlyDate: dayView ? selectedDate : null });
   refreshZoom();
   renderLegend(types);
   updateSummary(year, month, lessons, types, rules);
@@ -101,7 +128,8 @@ function renderLegend(types) {
 // 今日の列が見えるように横スクロールする(今日がない月は左端へ)
 // 縦は 8:00 あたりから見えるようにする
 function scrollToToday() {
-  const todayCell = table.querySelector('thead th.today');
+  if (viewMode === 'day') scroller.scrollLeft = 0;
+  const todayCell = viewMode === 'day' ? null : table.querySelector('thead th.today');
   const timeColWidth = table.querySelector('.time-col').offsetWidth;
   scroller.scrollLeft = todayCell ? Math.max(0, todayCell.offsetLeft - timeColWidth - todayCell.offsetWidth * 2) : 0;
   const eight = table.querySelector('td[data-time="8:00"]');
@@ -109,7 +137,18 @@ function scrollToToday() {
   scroller.scrollTop = eight ? eight.offsetTop - headHeight : 0;
 }
 
+// 1日ビュー:前の日・次の日(月をまたぐときは、その月を読み込む)
+function moveDay(diff) {
+  clearSelection();
+  const [y, m, d] = selectedDate.split('-').map(Number);
+  const next = new Date(y, m - 1, d + diff);
+  selectedDate = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+  current = { year: next.getFullYear(), month: next.getMonth() + 1 };
+  show();
+}
+
 function moveMonth(diff) {
+  if (viewMode === 'day') return moveDay(diff);
   clearSelection();
   const d = new Date(current.year, current.month - 1 + diff, 1);
   current = { year: d.getFullYear(), month: d.getMonth() + 1 };
@@ -118,10 +157,34 @@ function moveMonth(diff) {
 
 document.getElementById('prev-month').addEventListener('click', () => moveMonth(-1));
 document.getElementById('next-month').addEventListener('click', () => moveMonth(1));
-document.getElementById('this-month').addEventListener('click', () => {
+thisMonthBtn.addEventListener('click', () => {
   clearSelection();
   current = thisMonth();
+  selectedDate = todayKey();
   show();
+});
+
+// 「月表示 / 1日表示」の切り替え(スマホ)
+viewToggle.addEventListener('click', () => {
+  clearSelection();
+  viewMode = viewMode === 'day' ? 'month' : 'day';
+  if (viewMode === 'day') selectedDate = defaultDay();
+  show().then(fitDayHeight);
+});
+
+// 1日ビューでは、指で左右になぞると前後の日に移る
+let swipe = null;
+scroller.addEventListener('touchstart', e => {
+  swipe = viewMode === 'day' && e.touches.length === 1
+    ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
+}, { passive: true });
+scroller.addEventListener('touchend', e => {
+  if (!swipe || table.classList.contains('selecting') || scroller.classList.contains('drag-lock')) { swipe = null; return; }
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+  const quick = Date.now() - swipe.t < 700;
+  swipe = null;
+  if (quick && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) moveDay(dx < 0 ? 1 : -1);
 });
 
 // 表のタップ:予定のブロック → 編集、空いたマス → 新規、「予定」の行 → 日ごとのメモ

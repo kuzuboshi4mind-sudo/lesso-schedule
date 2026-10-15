@@ -1189,8 +1189,8 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
   font-weight: 600;
 }
 .calendar .lesson .lesson-line { font-weight: 500; }
-/* 仮:印なし。細い点線で囲んで、確約と見分けやすく */
-.calendar .lesson.tentative { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+/* 仮:薄い色+点線(確約は濃い色で印なし) */
+.calendar .lesson.tentative { background: color-mix(in srgb, var(--type-color) 45%, #ffffff); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
 .calendar .lesson.tentative .lesson-name { font-weight: 600; }
 @supports (outline-style: dashed) {
   .calendar .lesson.tentative { box-shadow: none; outline: 1px dashed rgba(0, 0, 0, 0.45); outline-offset: -2px; }
@@ -1227,6 +1227,32 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
 .lesson-short-dur { font-size: 0.65em; font-weight: 500; margin-left: 1px; opacity: 0.8; }
 /* 上の帯の見本も同じ見た目に */
 .legend-lesson.lesson { height: 20px; line-height: 20px; color: #1a1a1a; }
-.legend-lesson.lesson.tentative { outline: 1px dashed rgba(0, 0, 0, 0.45); outline-offset: -2px; background: var(--type-color); }
+.legend-lesson.lesson.tentative { outline: 1px dashed rgba(0, 0, 0, 0.45); outline-offset: -2px; background: color-mix(in srgb, var(--type-color) 45%, #ffffff); }
 .legend-lesson.lesson.cancelled { background: var(--type-color); opacity: 0.55; }
 .legend-lesson.lesson.none { background: transparent; font-weight: 400; }
+
+/* =========================================================
+   1日ビュー(スマホで開いた瞬間の表示。今日の1日を大きく1列で)
+   ========================================================= */
+body.day-view {
+  --day-col: calc(100vw - var(--time-col) - 4px);
+}
+body.day-view { --h-date: 0px; --h-week: 0px; }
+body.day-view .calendar { font-size: 14px; }
+/* 日付と曜日は上の題名に出ているので、表の見出しは「予定」の行だけにする */
+body.day-view .calendar .row-date,
+body.day-view .calendar .row-week { display: none; }
+body.day-view .calendar tbody .time-col { font-size: 11px; line-height: 1; }
+body.day-view .calendar .lesson { line-height: var(--row); }
+/* 1日ビューでは列全体が今日なので、黄色にせずふつうのしまにする */
+body.day-view .calendar tbody td.today { background: var(--surface); }
+body.day-view .calendar tbody tr:not(.hour) td.today { background: var(--nb-zebra); }
+body.day-view .calendar tbody td.off.today { background: var(--nb-off); }
+body.day-view .calendar tbody tr:not(.hour) td.off.today { background: var(--nb-off-zebra); }
+body.day-view .calendar .lesson.none { font-size: 0.85em; }
+body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
+/* スマホでは「1か月表示」の代わりに「月表示 / 1日表示」(ピンチの拡大・縮小はそのまま使える) */
+@media (max-width: 600px), (max-height: 500px) {
+  #zoom-fit { display: none; }
+}
+.view-toggle[hidden] { display: none; }

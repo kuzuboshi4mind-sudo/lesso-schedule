@@ -9,6 +9,12 @@
 const BASE = { timeCol: 56, headRows: 34 + 26 + 40 };
 // 時刻の行の数(ふだんは 8:00〜23:30 の32行。8時前に予定がある月は増える)
 const rowCount = () => table.querySelectorAll('tbody tr').length || 32;
+// 見出し(日付・曜日・予定の行)の高さ。1日ビューでは「予定」の行だけになるので、実際の表から測る
+const headHeight = zf => {
+  const thead = table.querySelector('thead');
+  const now = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--zf')) || 1;
+  return thead ? thead.offsetHeight / now * zf : BASE.headRows * zf;
+};
 // 30分の行の高さと日付の列の幅(拡大率1のとき)。スマホでは変わるので、CSS の --row-base / --day-base から読む
 const cssPx = (name, fallback) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
 const baseRow = () => cssPx('--row-base', 34);
@@ -53,6 +59,12 @@ export function refreshZoom() {
   apply();
 }
 
+// 縦の大きさを「1日がちょうど入る大きさ」にし直す(月表示と1日ビューを切り替えたとき)
+export function fitDayHeight() {
+  zy = 0;
+  apply();
+}
+
 // その月がちょうど1画面に収まる拡大率
 function fitScale() {
   const days = table.querySelectorAll('thead .row-date th[data-date]').length || 31;
@@ -64,11 +76,13 @@ function fitScale() {
     const zf = fontScale(fx, fy);
     const timeCol = BASE.timeCol * Math.max(zf, 0.8);
     fx = (w - timeCol - 4) / (days * baseDay());
-    fy = (h - BASE.headRows * zf - 4) / (rowCount() * baseRow());
+    fy = (h - headHeight(zf) - 4) / (rowCount() * baseRow());
   }
   // スマホは1か月を横に全部入れると文字が読めないので、列の幅に下限をつける(残りは横スクロール)
   if (phoneQuery.matches) fx = Math.max(fx, PHONE_MIN_DAY / baseDay());
-  return { fx: Math.min(fx, 1), fy: Math.min(fy, 1) };
+  // 1日ビューは、1日がちょうど画面の高さいっぱいになるように行を伸ばしてよい
+  const dayView = document.body.classList.contains('day-view');
+  return { fx: Math.min(fx, 1), fy: Math.min(fy, dayView ? MAX : 1) };
 }
 
 // 文字の大きさは、横と縦の小さいほうに合わせる(小さくなりすぎないよう 0.6 倍まで)
