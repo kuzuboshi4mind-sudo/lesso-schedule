@@ -997,3 +997,23 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
   .type-legend, .status-legend { flex-wrap: nowrap; flex: none; white-space: nowrap; }
   .type-legend { gap: 10px; }
 }
+
+/* =========================================================
+   LINE で予定を送る
+   ========================================================= */
+.btn-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #06c755;     /* LINE の緑 */
+  border-color: #06c755;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.btn-line[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+#student-line { width: 100%; margin: 4px 0 8px; }
+.line-template { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.line-template summary { min-height: 44px; display: flex; align-items: center; color: var(--muted); cursor: pointer; }
+.line-template textarea { margin-bottom: 8px; }
+.button-row + .sheet-note { margin-top: 10px; }

@@ -326,11 +326,52 @@
         <span class="field-label">メモ(希望の曜日・時間、注文など)</span>
         <textarea id="student-memo" rows="6" placeholder="例:火・木の17時以降を希望&#10;発表会でショパンを弾きたい"></textarea>
       </label>
+      <button type="button" id="student-line" class="btn btn-line">LINE で予定を送る</button>
       <div id="student-info" class="student-info"></div>
       <div class="sheet-actions">
         <button type="button" id="student-delete" class="btn btn-danger">この生徒を削除</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- LINE で予定を送る(文面を作って LINE を開く。送る相手は LINE の画面で選ぶ) -->
+  <dialog id="line-dialog" class="sheet">
+    <div class="sheet-head">
+      <h2 id="line-title" tabindex="-1">LINE で予定を送る</h2>
+      <button type="button" class="btn" data-close>閉じる</button>
+    </div>
+    <div class="field-row">
+      <label class="field">
+        <span class="field-label">期間</span>
+        <select id="line-range"></select>
+      </label>
+      <label class="field">
+        <span class="field-label">送る予定</span>
+        <select id="line-status">
+          <option value="tentative">仮の予定だけ</option>
+          <option value="both">仮と確約</option>
+        </select>
+      </label>
+    </div>
+    <label class="field">
+      <span class="field-label">文面(送る前にここで直せます)</span>
+      <textarea id="line-text" rows="10"></textarea>
+    </label>
+    <p id="line-count" class="sheet-note"></p>
+    <div class="button-row">
+      <a id="line-open" class="btn btn-line" href="#" target="_blank" rel="noopener">LINE を開く</a>
+      <button type="button" id="line-copy" class="btn">文面をコピー</button>
+    </div>
+    <p class="sheet-note">「LINE を開く」を押すと LINE の「送信先を選択」の画面が開きます。送る相手を選んで送ってください。</p>
+    <details class="line-template">
+      <summary>ひな形(いつもの文面)を変える</summary>
+      <p class="sheet-note">{名前}・{期間}・{予定} のところに、自動で中身が入ります。</p>
+      <textarea id="line-template" rows="6"></textarea>
+      <div class="button-row">
+        <button type="button" id="line-template-save" class="btn">ひな形を保存</button>
+        <button type="button" id="line-template-reset" class="btn">はじめのひな形に戻す</button>
+      </div>
+    </details>
   </dialog>
 
   <!-- 固定枠の予定を変える・消すときに「この日だけ / この日以降」を選ぶ画面 -->

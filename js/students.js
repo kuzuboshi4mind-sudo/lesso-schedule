@@ -5,8 +5,10 @@
 // ・「この生徒を削除」で一覧と名前の候補から外す(予定は残る)。一覧の下の「削除した生徒」から戻せる
 // ・「なし(自分の予定)」や集計に入れない種類の予定の名前は、生徒として並べない
 // ・予定の入力画面では、名前の下にその生徒のメモが出る
+// ・「LINE で予定を送る」で、その生徒の予定の文面を作って LINE を開く(js/line-share.js)
 import * as store from './store.js';
 import { escapeHtml } from './calendar.js';
+import { openLineShare } from './line-share.js';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -26,6 +28,7 @@ const f = {
   memo: document.getElementById('student-memo'),
   info: document.getElementById('student-info'),
   del: document.getElementById('student-delete'),
+  line: document.getElementById('student-line'),
 };
 
 let onChanged = () => {};
@@ -55,6 +58,7 @@ export function initStudents(opts) {
   }
   form.addEventListener('submit', onSave);
   f.del.addEventListener('click', onDelete);
+  f.line.addEventListener('click', () => openLineShare(editing.name));
   // Mac:⌘S / ⌘return で保存
   form.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); form.requestSubmit(); }
@@ -137,6 +141,7 @@ async function openStudent(student) {
   f.memo.value = editing.memo;
   f.error.textContent = '';
   f.del.hidden = isNew;
+  f.line.hidden = isNew;
   f.info.innerHTML = isNew ? '' : await infoHtml(editing);
   dialog.showModal();
   if (isNew) f.name.focus(); else f.title.focus();

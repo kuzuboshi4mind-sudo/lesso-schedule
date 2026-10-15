@@ -9,6 +9,7 @@ import { requireLogin, watchLogout, logout } from './login.js';
 import { initTrashBackup, showLastBackup } from './trash-backup.js';
 import { initRecurring } from './recurring.js';
 import { initStudents } from './students.js';
+import { initLineShare } from './line-share.js';
 import { initSummary, updateSummary } from './summary.js';
 
 const table = document.getElementById('calendar');
@@ -18,7 +19,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '手順11(2026-10-15)';
+const APP_VERSION = '手順12(2026-10-15)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -133,6 +134,7 @@ initTrashBackup({ getMonth: () => current, onChanged: () => show({ keepScroll: t
 document.getElementById('open-settings').addEventListener('click', showLastBackup);
 initRecurring({ onChanged: () => show({ keepScroll: true }) });
 initSummary();
+initLineShare();
 initStudents({ onChanged: () => show({ keepScroll: true }) });
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)

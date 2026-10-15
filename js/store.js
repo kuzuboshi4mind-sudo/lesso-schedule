@@ -726,7 +726,7 @@ export async function getUpcomingLessons(name) {
   const [lessons, occurrences] = await Promise.all([db.listLessons(today, to), getOccurrences(today, to)]);
   return lessons.concat(occurrences)
     .filter(l => l.student === name)
-    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+    .sort((a, b) => (a.date + a.start.padStart(5, '0')).localeCompare(b.date + b.start.padStart(5, '0')));
 }
 
 // 生徒メモを保存する(id がなければ新しく作る)。同じ名前の生徒がいればその人のメモにする
@@ -798,4 +798,24 @@ export async function setTentativeMonth(year, month, tentative) {
   const before = !!(await db.listMonths())[ym];
   if (before === tentative) return;
   await commit({ label: `${month}月を${tentative ? '仮' : '確定'}にする`, months: [{ ym, before, after: tentative }] });
+}
+
+// ---- LINE で予定を送る ----
+// その生徒の、期間内の予定(固定枠から入る予定も含む。時刻の順)
+export async function getStudentLessons(name, from, to) {
+  const [lessons, occurrences] = await Promise.all([db.listLessons(from, to), getOccurrences(from, to)]);
+  return lessons.concat(occurrences)
+    .filter(l => l.student === name)
+    .sort((a, b) => (a.date + a.start.padStart(5, '0')).localeCompare(b.date + b.start.padStart(5, '0')));
+}
+
+// 送る文面のひな形({名前}{期間}{予定} が自動で入る)。どの端末でも同じものを使う
+export const DEFAULT_LINE_TEMPLATE = '{名前}さん\nこんにちは。{期間}のレッスンの予定です。\n\n{予定}\n\nご都合はいかがでしょうか。よろしくお願いします。';
+
+export async function getLineTemplate() {
+  return (await db.getSetting('lineTemplate')) || DEFAULT_LINE_TEMPLATE;
+}
+
+export async function saveLineTemplate(text) {
+  await db.setSetting('lineTemplate', text);
 }
