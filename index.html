@@ -231,6 +231,15 @@
     </section>
 
     <section class="settings-section">
+      <h3>Numbers に書き出す</h3>
+      <p class="sheet-note">表を Excel 形式(.xlsx)のファイルにします。Numbers で開くと、今の Numbers と同じ形の表(色つき)と集計・生徒の一覧が出ます。月ごとに1枚のシートになります。</p>
+      <div class="button-row">
+        <button type="button" id="xlsx-month" class="btn">表示中の月</button>
+        <button type="button" id="xlsx-year" class="btn">この年の1〜12月</button>
+      </div>
+    </section>
+
+    <section class="settings-section">
       <h3>種類と色</h3>
       <p class="sheet-note">色の丸をタップすると色を選べます。上から順に、入力画面と色の見本に並びます。</p>
       <ul id="type-list" class="type-list"></ul>
@@ -260,7 +269,7 @@
   <!-- バックアップの保存 -->
   <dialog id="save-dialog" class="sheet sheet-small">
     <div class="sheet-head">
-      <h2 tabindex="-1">バックアップを保存</h2>
+      <h2 id="save-title" tabindex="-1">バックアップを保存</h2>
       <button type="button" class="btn" data-close>閉じる</button>
     </div>
     <p id="save-name" class="sheet-note"></p>

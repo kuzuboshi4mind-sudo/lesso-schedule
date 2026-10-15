@@ -3,6 +3,7 @@
 // ・バックアップ:この月/全部の予定をファイル(.json)に書き出す。書き出したファイルを読み込んで元に戻す
 import * as store from './store.js';
 import { escapeHtml } from './calendar.js';
+import { buildXlsx } from './export-xlsx.js';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -16,10 +17,12 @@ const saveDialog = document.getElementById('save-dialog');
 const saveLink = document.getElementById('save-link');
 const saveShare = document.getElementById('save-share');
 const saveName = document.getElementById('save-name');
+const saveTitle = document.getElementById('save-title');
 const fileInput = document.getElementById('backup-file');
 const lastBackup = document.getElementById('last-backup');
 
 let pendingFile = null;   // 書き出し用に作ったファイル(共有ボタンで使う)
+let onSaved = () => {};   // 保存したあとにすること(バックアップなら書き出した日を記録)
 
 export function initTrashBackup(opts) {
   ({ getMonth, onChanged } = opts);
@@ -29,8 +32,10 @@ export function initTrashBackup(opts) {
   document.getElementById('export-all').addEventListener('click', () => exportBackup(false));
   document.getElementById('import-backup').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', importBackup);
+  document.getElementById('xlsx-month').addEventListener('click', () => exportXlsx(true));
+  document.getElementById('xlsx-year').addEventListener('click', () => exportXlsx(false));
   saveShare.addEventListener('click', shareFile);
-  saveLink.addEventListener('click', () => { store.markBackedUp(); setTimeout(() => saveDialog.close(), 300); showLastBackup(); });
+  saveLink.addEventListener('click', () => { onSaved(); setTimeout(() => saveDialog.close(), 300); });
   for (const d of [trashDialog, saveDialog]) {
     d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
   }
@@ -105,23 +110,56 @@ async function exportBackup(thisMonthOnly) {
   const name = m
     ? `lesson-backup-${m.year}-${String(m.month).padStart(2, '0')}.json`
     : `lesson-backup-all-${stamp}.json`;
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  pendingFile = new File([blob], name, { type: 'application/json' });
+  const file = new File([JSON.stringify(data, null, 2)], name, { type: 'application/json' });
+  offerFile(file, 'バックアップを保存',
+    `${name}(予定${data.lessons.length}件・${data.months.length ? data.months.join('、') : '予定なし'})`,
+    () => { store.markBackedUp(); showLastBackup(); });
+}
+
+// できたファイルを保存する画面を出す(「ファイルを保存」と、使える端末では「共有…」)
+function offerFile(file, title, description, saved = () => {}) {
+  pendingFile = file;
+  onSaved = saved;
   if (saveLink.href.startsWith('blob:')) URL.revokeObjectURL(saveLink.href);
-  saveLink.href = URL.createObjectURL(blob);
-  saveLink.download = name;
-  saveName.textContent = `${name}(予定${data.lessons.length}件・${data.months.length ? data.months.join('、') : '予定なし'})`;
+  saveLink.href = URL.createObjectURL(file);
+  saveLink.download = file.name;
+  saveTitle.textContent = title;
+  saveName.textContent = description;
   // 共有(「ファイルに保存」「AirDrop」など)が使える端末だけ、共有ボタンを出す
   saveShare.hidden = !(navigator.canShare && navigator.canShare({ files: [pendingFile] }));
   saveDialog.showModal();
-  saveDialog.querySelector('h2').focus();
+  saveTitle.focus();
+}
+
+// ---------------------------------------------------------
+// Numbers への書き出し(.xlsx)
+// ---------------------------------------------------------
+async function exportXlsx(thisMonthOnly) {
+  const m = getMonth();
+  const months = thisMonthOnly ? [m] : Array.from({ length: 12 }, (_, i) => ({ year: m.year, month: i + 1 }));
+  const name = thisMonthOnly
+    ? `lesson-${m.year}-${String(m.month).padStart(2, '0')}.xlsx`
+    : `lesson-${m.year}.xlsx`;
+  const btn = document.getElementById(thisMonthOnly ? 'xlsx-month' : 'xlsx-year');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '作っています…';
+  try {
+    const file = await buildXlsx(months, name);
+    offerFile(file, 'Numbers 用のファイルを保存',
+      `${name}(${thisMonthOnly ? `${m.month}月` : `${m.year}年1〜12月`})。保存したファイルを「ファイル」アプリでタップすると Numbers で開けます。`);
+  } catch (err) {
+    alert(`書き出せませんでした(${err.message})`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
 }
 
 async function shareFile() {
   try {
     await navigator.share({ files: [pendingFile], title: pendingFile.name });
-    store.markBackedUp();
-    showLastBackup();
+    onSaved();
     saveDialog.close();
   } catch (err) {
     if (err.name !== 'AbortError') alert(`共有できませんでした(${err.message})`);
