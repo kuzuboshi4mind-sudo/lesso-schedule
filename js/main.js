@@ -19,7 +19,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '1日ビュー(2026-10-16)';
+const APP_VERSION = 'パステルの色・ライブ(2026-10-16)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -122,7 +122,7 @@ monthStatus.addEventListener('click', async () => {
 
 function renderLegend(types) {
   legend.innerHTML = types.map(t =>
-    `<li><span class="legend-swatch" style="background:${t.color}"></span>${escapeHtml(t.name)}</li>`).join('');
+    `<li><span class="legend-swatch pastel" style="--type-color:${t.color}"></span>${escapeHtml(t.name)}</li>`).join('');
 }
 
 // 今日の列が見えるように横スクロールする(今日がない月は左端へ)

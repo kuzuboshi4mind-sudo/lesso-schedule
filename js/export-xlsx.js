@@ -72,7 +72,7 @@ function durationLabel(l) {
 
 // 予定を塗るときの見た目
 function lessonStyle(l, type) {
-  const color = type ? type.color : '#9e9e9e';
+  const color = store.lessonColor(l, type);
   const status = l.status || 'tentative';
   if (status === 'confirmed') {
     return { fill: fill(argb(color)), font: { bold: true, color: { argb: argb(textColorFor(color)) } } };

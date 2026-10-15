@@ -28,7 +28,7 @@
   --time-col: calc(56px * max(var(--zf), 0.8));  /* 時刻の列の幅 */
   --day-base: 58px;                              /* 日付の列の幅(拡大率1のとき。スマホは下で広くする) */
   --day-col: calc(var(--day-base) * var(--zx));  /* 日付の列の幅 */
-  --row-base: 34px;                              /* 30分の行の高さ(拡大率1のとき。スマホは下で小さくする) */
+  --row-base: 28px;                              /* 30分の行の高さ(拡大率1のとき。スマホは下で小さくする) */
   --row: calc(var(--row-base) * var(--zy));      /* 30分の行の高さ */
   --h-date: calc(34px * var(--zf));              /* 日付の行の高さ */
   --h-week: calc(26px * var(--zf));              /* 曜日の行の高さ */
@@ -294,7 +294,7 @@ body {
    iPad はどちらの向きでも当てはまらないので、今までどおり */
 @media (max-width: 600px), (max-height: 500px) {
   /* 行は低く、列は広く(名前が読めるように) */
-  :root { --row-base: 18px; --day-base: 36px; }
+  :root { --row-base: 16px; --day-base: 36px; }
   .calendar { font-size: calc(11px * var(--zf)); }
   /* 30分以下の予定は、名前を1行にして収める */
   .lesson.half { padding-top: 0; padding-bottom: 0; }
@@ -1256,3 +1256,16 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
   #zoom-fit { display: none; }
 }
 .view-toggle[hidden] { display: none; }
+
+/* =========================================================
+   パステル寄りの色(2026-10-16):種類の色に白を混ぜて、やわらかい色で塗る
+   (設定の色はそのまま。仮はさらに薄く)
+   ========================================================= */
+:root { --pastel: 62%; --pastel-tentative: 32%; }
+.calendar .lesson.confirmed,
+.calendar .lesson.cancelled,
+.legend-lesson.lesson.confirmed,
+.legend-lesson.lesson.cancelled { background: color-mix(in srgb, var(--type-color) var(--pastel), #ffffff); }
+.calendar .lesson.tentative,
+.legend-lesson.lesson.tentative { background: color-mix(in srgb, var(--type-color) var(--pastel-tentative), #ffffff); }
+.legend-swatch.pastel { background: color-mix(in srgb, var(--type-color) var(--pastel), #ffffff); }

@@ -1,5 +1,6 @@
 // 月表(30分刻み×日付)を描く
 import { holidayName } from './holidays.js';
+import { lessonColor } from './store.js';
 
 export const START_HOUR = 6;      // 表の最初の時刻 6:00
 export const END_HOUR = 23;       // 最後の行は 23:30(24:00まで)
@@ -109,7 +110,7 @@ const STATUS_LABEL = { tentative: '仮', confirmed: '確約', cancelled: 'キャ
 // 30分ごとの行に1行ずつ文字を入れる:1行目=名前と印、2行目=長さ(15分・45分・〜18:30 など。30分単位なら名前)、3行目から=名前
 function lessonBlock(lesson, type, pos, solo = false) {
   const offset = toMinutes(lesson.start) % 30;      // マスの上端から何分ずれているか
-  const color = type ? type.color : '#9e9e9e';
+  const color = lessonColor(lesson, type);
   const status = lesson.status || 'tentative';
   const width = 100 / pos.lanes;
   const memoMark = lesson.memo ? '<span class="lesson-memo-mark">✎</span>' : '';

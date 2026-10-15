@@ -25,9 +25,11 @@ const DEFAULT_TYPES = [
   { id: 'sunpal',   name: 'サンパル', color: '#3fe8e9', countInTotal: true },
   { id: 'visit',    name: '訪問',     color: '#5c70f4', countInTotal: true },
   { id: 'online',   name: 'オンライン', color: '#2bb8ba', countInTotal: true },
-  { id: 'jinis',    name: 'JINIS',    color: '#ffdbd8', countInTotal: true },
+  // JINIS は Numbers と同じく曜日で色を変える(月=薄い黄・火=薄いピンク・木=薄い水色。ほかの曜日は color)
+  { id: 'jinis',    name: 'JINIS',    color: '#ffdbd8', countInTotal: true, weekdayColors: { 1: '#ffe37f', 2: '#ffdbd8', 4: '#cbf0ff' } },
   { id: 'sauna',    name: 'サウナ',   color: '#d7bfae', countInTotal: false },
   { id: 'practice', name: '練習',     color: '#9edbd2', countInTotal: false },
+  { id: 'live',     name: 'ライブ',   color: '#d9c2f0', countInTotal: false },
   { id: 'other',    name: 'その他',   color: '#d9d9d9', countInTotal: false },
 ];
 
@@ -71,7 +73,41 @@ function newId() {
 
 // ---- 種類 ----
 export async function getTypes() {
-  return (await db.getSetting('types')) || DEFAULT_TYPES;
+  const saved = await db.getSetting('types');
+  if (!saved) return DEFAULT_TYPES;
+  return addNewDefaultTypes(saved);
+}
+
+// あとから増えた種類(2026-10-16 の「ライブ」)を、保存済みの種類にも1回だけ足す
+// (一度足したら記録するので、本人が設定で削除したらもう足さない)
+const TYPE_MIGRATIONS = ['live'];
+async function addNewDefaultTypes(saved) {
+  const done = (await db.getSetting('typeMigrations')) || [];
+  const todo = TYPE_MIGRATIONS.filter(id => !done.includes(id));
+  if (!todo.length) return saved;
+  const types = [...saved];
+  for (const id of todo) {
+    if (types.some(t => t.id === id)) continue;
+    const def = DEFAULT_TYPES.find(t => t.id === id);
+    const other = types.findIndex(t => t.id === 'other');
+    types.splice(other >= 0 ? other : types.length, 0, { ...def });   // 「その他」の前に入れる
+  }
+  await db.setSetting('types', types);
+  await db.setSetting('typeMigrations', [...done, ...todo]);
+  return types;
+}
+
+// 予定を塗る色(種類の色。JINIS のように曜日で色が変わる種類は、その曜日の色)
+const JINIS_WEEKDAY_COLORS = { 1: '#ffe37f', 2: '#ffdbd8', 4: '#cbf0ff' };
+export function lessonColor(lesson, type) {
+  if (!type) return '#9e9e9e';
+  const byWeekday = type.weekdayColors || (type.id === 'jinis' ? JINIS_WEEKDAY_COLORS : null);
+  if (byWeekday && lesson?.date) {
+    const [y, m, d] = lesson.date.split('-').map(Number);
+    const c = byWeekday[new Date(y, m - 1, d).getDay()];
+    if (c) return c;
+  }
+  return type.color;
 }
 
 // 種類の一覧をまるごと保存する(設定画面から)
