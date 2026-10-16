@@ -888,6 +888,8 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .summary-table th[scope="row"] .legend-swatch { display: inline-block; margin-right: 8px; vertical-align: -2px; }
 .summary-table tfoot th, .summary-table tfoot td { border-top: 2px solid var(--line-strong); border-bottom: none; font-size: 1.05rem; }
 .summary-table td strong { font-size: 1.1rem; }
+.summary-table caption.summary-sub { text-align: left; }
+.summary-sub { font-size: 0.95rem; font-weight: 700; color: var(--muted); margin: 8px 0 2px; }
 .summary-table .tentative-col { color: var(--muted); }
 .summary-table .tentative-col strong { color: var(--muted); }
 .muted { color: var(--muted); }
@@ -1269,6 +1271,10 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 .calendar .lesson.tentative,
 .legend-lesson.lesson.tentative { background: color-mix(in srgb, var(--type-color) var(--pastel-tentative), #ffffff); }
 .legend-swatch.pastel { background: color-mix(in srgb, var(--type-color) var(--pastel), #ffffff); }
+/* レッスン系(集計に入れる種類)は、パステルのまま少しだけ濃く(2026-10-16) */
+.calendar .lesson.counted,
+.legend-swatch.pastel.counted,
+.legend-lesson.lesson { --pastel: 74%; --pastel-tentative: 40%; }
 
 /* 種類「その他」は、二日酔いなどの書き込みと同じく塗らずに文字だけ(状態にかかわらず) */
 .calendar .lesson.plain,

@@ -30,6 +30,7 @@ const DEFAULT_TYPES = [
   { id: 'sauna',    name: 'サウナ',   color: '#d7bfae', countInTotal: false },
   { id: 'practice', name: '練習',     color: '#9edbd2', countInTotal: false },
   { id: 'live',     name: 'ライブ',   color: '#d9c2f0', countInTotal: false },
+  { id: 'fishing',  name: '釣り',     color: '#a9c8ee', countInTotal: false },   // 2026-10-16 に追加
   { id: 'other',    name: 'その他',   color: '#d9d9d9', countInTotal: false },
 ];
 
@@ -80,7 +81,7 @@ export async function getTypes() {
 
 // あとから増えた種類(2026-10-16 の「ライブ」)を、保存済みの種類にも1回だけ足す
 // (一度足したら記録するので、本人が設定で削除したらもう足さない)
-const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2'];
+const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2', 'fishing'];
 // 色を変える引き継ぎ:保存済みの色がこれまでの初期の色のままなら、新しい色にする(自分で選んだ色は変えない)
 const COLOR_MIGRATIONS = {
   'home-softer': { id: 'home', from: ['#ade467', '#4caf50'], to: '#c9eda0' },

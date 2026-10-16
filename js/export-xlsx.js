@@ -238,7 +238,26 @@ async function addMonthSheet(workbook, year, month, common) {
     for (let c = 2; c <= 8; c++) row.getCell(c).border = { bottom: side(bold ? COLORS.lineHour : COLORS.line, bold ? 'medium' : 'thin') };
   };
   for (const row of s.rows) summaryRow(row.type.name, row.type.color, row, false);
-  summaryRow('合計', null, s.total, true);
+  summaryRow('レッスン合計', null, s.total, true);
+  // レッスン以外(ライブ・サウナ・釣りなど):種類ごとの件数と時間(合計には入れない)
+  if (s.others.length) {
+    r += 2;
+    ws.getRow(r).getCell(2).value = 'レッスン以外(合計に入れない)';
+    ws.getRow(r).getCell(2).font = { bold: true, size: 10 };
+    for (const o of s.others) {
+      r++;
+      const row = ws.getRow(r);
+      row.getCell(2).value = o.type.name;
+      row.getCell(2).font = { bold: true, color: { argb: argb(textColorFor(o.type.color)) } };
+      row.getCell(2).fill = fill(argb(o.type.color));
+      ws.mergeCells(r, 2, r, 3);
+      row.getCell(4).value = o.count;
+      row.getCell(5).value = round(o.hours);
+      row.getCell(5).numFmt = '0.0#';
+      for (const c of [4, 5]) row.getCell(c).alignment = { horizontal: 'center' };
+      for (let c = 2; c <= 5; c++) row.getCell(c).border = { bottom: side(COLORS.line) };
+    }
+  }
   r += 2;
   ws.getRow(r).getCell(2).value = '合計は「確約」だけ。「仮」は参考。キャンセル・なし・集計に入れない種類は数えていません。'
     + ' 塗りの見方:濃い色+○=確約、薄い色+点線=仮、灰色+×=キャンセル、左に太い線=なし(自分の予定)';

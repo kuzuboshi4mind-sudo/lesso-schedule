@@ -1,11 +1,14 @@
 // 集計:月の合計時間と、種類ごとの時間数
 // ・合計に入れるのは「確約」だけ。「仮」は参考として別に数える
-// ・「キャンセル」「なし(自分の予定)」と、設定で「集計に入れない」にした種類は数えない
+// ・「キャンセル」「なし(自分の予定)」と、設定で「集計に入れない」にした種類は合計に入れない
+// ・集計に入れない種類(ライブ・サウナ・釣りなど)は、レッスンとは別に種類ごとの時間を出す
+//   (キャンセル以外は状態にかかわらず数える。書き込み用の「その他」は出さない)
 // ・時間数は換算表(設定画面)で数える。換算表にない長さは 分÷60
 import { escapeHtml } from './calendar.js';
 
 // 予定の一覧から集計を作る(画面とは関係ない計算だけ。テストしやすいように分けてある)
-// 戻り値:{ rows:[{ type, confirmed:{count,hours}, tentative:{count,hours} }], total:{...}, excluded:件数 }
+// 戻り値:{ rows:[{ type, confirmed:{count,hours}, tentative:{count,hours} }], total:{...},
+//          others:[{ type, count, hours }](レッスン以外の種類), excluded:件数 }
 export function computeSummary(lessons, types, rules) {
   const hoursOf = Object.fromEntries(rules.map(r => [r.minutes, r.hours]));
   const toHours = minutes => (minutes in hoursOf ? hoursOf[minutes] : minutes / 60);
@@ -13,11 +16,18 @@ export function computeSummary(lessons, types, rules) {
   const empty = () => ({ count: 0, hours: 0 });
   const byType = new Map(types.map(t => [t.id, { type: t, confirmed: empty(), tentative: empty() }]));
   const total = { confirmed: empty(), tentative: empty() };
+  const otherByType = new Map();
   let excluded = 0;
 
   for (const l of lessons) {
     const status = l.status || 'tentative';
     const type = typeById[l.typeId];
+    if (type && !type.countInTotal && type.id !== 'other' && status !== 'cancelled') {
+      if (!otherByType.has(type.id)) otherByType.set(type.id, { type, count: 0, hours: 0 });
+      const o = otherByType.get(type.id);
+      o.count++;
+      o.hours += toHours(l.duration);
+    }
     if (!type || !type.countInTotal || (status !== 'confirmed' && status !== 'tentative')) {
       excluded++;
       continue;
@@ -29,7 +39,8 @@ export function computeSummary(lessons, types, rules) {
     }
   }
   const rows = [...byType.values()].filter(r => r.type.countInTotal && (r.confirmed.count || r.tentative.count));
-  return { rows, total, excluded };
+  const others = types.map(t => otherByType.get(t.id)).filter(Boolean);   // 設定の並び順
+  return { rows, total, others, excluded };
 }
 
 // 時間数を見やすく(0.25 → 0.25、1.5 → 1.5、2 → 2.0)
@@ -72,17 +83,28 @@ export function updateSummary(year, month, lessons, types, rules) {
     </tr>`).join('');
   body.innerHTML = `
     <table class="summary-table">
+      <caption class="summary-sub">レッスン</caption>
       <thead><tr><th scope="col">種類</th><th scope="col">確約</th><th scope="col" class="tentative-col">仮(参考)</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="3" class="muted">この月は、集計に入る予定がありません</td></tr>'}</tbody>
       <tfoot><tr>
-        <th scope="row">合計</th>
+        <th scope="row">レッスン合計</th>
         <td>${cell(s.total.confirmed)}</td>
         <td class="tentative-col">${cell(s.total.tentative)}</td>
       </tr></tfoot>
     </table>
+    ${s.others.length ? `
+    <h3 class="summary-sub">レッスン以外(合計には入れていません)</h3>
+    <table class="summary-table">
+      <thead><tr><th scope="col">種類</th><th scope="col">件数</th><th scope="col">時間</th></tr></thead>
+      <tbody>${s.others.map(o => `<tr>
+        <th scope="row"><span class="legend-swatch" style="background:${o.type.color}"></span>${escapeHtml(o.type.name)}</th>
+        <td>${o.count}件</td><td><strong>${formatHours(o.hours)}h</strong></td>
+      </tr>`).join('')}</tbody>
+    </table>` : ''}
     <p class="sheet-note">
-      合計に入るのは「確約」だけです。「仮」は参考として別に数えています。<br>
-      キャンセル・「なし(自分の予定)」・集計に入れない種類の予定(この月は${s.excluded}件)は数えていません。<br>
+      レッスンの合計に入るのは「確約」だけです。「仮」は参考として別に数えています。<br>
+      キャンセル・「なし(自分の予定)」・集計に入れない種類の予定(この月は${s.excluded}件)はレッスンの合計に入れていません。<br>
+      レッスン以外の種類(ライブ・サウナ・釣りなど)は、キャンセル以外を種類ごとに数えて、別の表に出しています。<br>
       時間数は設定画面の換算表で数えます(換算表にない長さは 分÷60)。
     </p>`;
 }
