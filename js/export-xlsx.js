@@ -74,9 +74,9 @@ function durationLabel(l) {
 function lessonStyle(l, type) {
   const color = store.lessonColor(l, type);
   const status = l.status || 'tentative';
-  // 種類「その他」は塗らずに文字だけ(アプリの表と同じ)
+  // 種類「その他」は種類の色(薄い水色)で塗り、ふつうの文字(アプリの表と同じ)
   if (type?.id === 'other') {
-    return { fill: fill('FFFFFFFF'), font: { strike: status === 'cancelled', color: { argb: COLORS.text } } };
+    return { fill: fill(argb(color)), font: { strike: status === 'cancelled', color: { argb: COLORS.text } } };
   }
   if (status === 'confirmed') {
     return { fill: fill(argb(color)), font: { bold: true, color: { argb: argb(textColorFor(color)) } } };

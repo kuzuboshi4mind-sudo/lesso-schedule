@@ -20,7 +20,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'ダブルタップで直接入力・長い予定に開始と終了の時刻(2026-10-16)';
+const APP_VERSION = 'その他を薄い水色・JINIS 木曜を少し濃く(2026-10-16)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)

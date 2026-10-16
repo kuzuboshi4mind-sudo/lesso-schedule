@@ -26,12 +26,12 @@ const DEFAULT_TYPES = [
   { id: 'visit',    name: '訪問',     color: '#5c70f4', countInTotal: true },
   { id: 'online',   name: 'オンライン', color: '#2bb8ba', countInTotal: true },
   // JINIS は Numbers と同じく曜日で色を変える(月=薄い黄・火=薄いピンク・木=薄い水色。ほかの曜日は color)
-  { id: 'jinis',    name: 'JINIS',    color: '#ffdbd8', countInTotal: true, weekdayColors: { 1: '#ffe37f', 2: '#ffdbd8', 4: '#cbf0ff' } },
+  { id: 'jinis',    name: 'JINIS',    color: '#ffdbd8', countInTotal: true, weekdayColors: { 1: '#ffe37f', 2: '#ffdbd8', 4: '#9fdcf7' } },   // 木の水色は 2026-10-16 に少し濃く(元は #cbf0ff)
   { id: 'sauna',    name: 'サウナ',   color: '#d7bfae', countInTotal: false },
   { id: 'practice', name: '練習',     color: '#9edbd2', countInTotal: false },
   { id: 'live',     name: 'ライブ',   color: '#d9c2f0', countInTotal: false },
   { id: 'fishing',  name: '釣り',     color: '#a9c8ee', countInTotal: false },   // 2026-10-16 に追加
-  { id: 'other',    name: 'その他',   color: '#d9d9d9', countInTotal: false },
+  { id: 'other',    name: 'その他',   color: '#e2f4fc', countInTotal: false },   // 2026-10-16 に灰色(#d9d9d9)から、JINIS より薄い水色に
 ];
 
 // Numbers で使っていた色(2026-10-16 から初期値。設定画面の「Numbers と同じ色にする」でも使う)
@@ -81,11 +81,14 @@ export async function getTypes() {
 
 // あとから増えた種類(2026-10-16 の「ライブ」)を、保存済みの種類にも1回だけ足す
 // (一度足したら記録するので、本人が設定で削除したらもう足さない)
-const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2', 'fishing'];
+const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2', 'fishing', 'other-lightblue', 'jinis-thu-deeper'];
 // 色を変える引き継ぎ:保存済みの色がこれまでの初期の色のままなら、新しい色にする(自分で選んだ色は変えない)
 const COLOR_MIGRATIONS = {
   'home-softer': { id: 'home', from: ['#ade467', '#4caf50'], to: '#c9eda0' },
   'home-soft2': { id: 'home', from: ['#c9eda0', '#ade467', '#4caf50'], to: '#bce98a' },
+  'other-lightblue': { id: 'other', from: ['#d9d9d9', '#9e9e9e'], to: '#e2f4fc' },
+  // weekday があるときは、その曜日の色(weekdayColors)を変える
+  'jinis-thu-deeper': { id: 'jinis', weekday: 4, from: ['#cbf0ff'], to: '#9fdcf7' },
 };
 async function addNewDefaultTypes(saved) {
   const done = (await db.getSetting('typeMigrations')) || [];
@@ -96,7 +99,12 @@ async function addNewDefaultTypes(saved) {
     const recolor = COLOR_MIGRATIONS[id];
     if (recolor) {
       const t = types.find(x => x.id === recolor.id);
-      if (t && recolor.from.includes(String(t.color).toLowerCase())) types[types.indexOf(t)] = { ...t, color: recolor.to };
+      if (t && recolor.weekday != null) {
+        const now = t.weekdayColors?.[recolor.weekday];
+        if (now && recolor.from.includes(String(now).toLowerCase())) {
+          types[types.indexOf(t)] = { ...t, weekdayColors: { ...t.weekdayColors, [recolor.weekday]: recolor.to } };
+        }
+      } else if (t && recolor.from.includes(String(t.color).toLowerCase())) types[types.indexOf(t)] = { ...t, color: recolor.to };
       continue;
     }
     if (types.some(t => t.id === id)) continue;
@@ -110,7 +118,7 @@ async function addNewDefaultTypes(saved) {
 }
 
 // 予定を塗る色(種類の色。JINIS のように曜日で色が変わる種類は、その曜日の色)
-const JINIS_WEEKDAY_COLORS = { 1: '#ffe37f', 2: '#ffdbd8', 4: '#cbf0ff' };
+const JINIS_WEEKDAY_COLORS = { 1: '#ffe37f', 2: '#ffdbd8', 4: '#9fdcf7' };
 export function lessonColor(lesson, type) {
   if (!type) return '#9e9e9e';
   const byWeekday = type.weekdayColors || (type.id === 'jinis' ? JINIS_WEEKDAY_COLORS : null);

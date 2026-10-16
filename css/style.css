@@ -1292,12 +1292,13 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 .legend-swatch.pastel.counted,
 .legend-lesson.lesson { --pastel: 74%; --pastel-tentative: 40%; }
 
-/* 種類「その他」は、二日酔いなどの書き込みと同じく塗らずに文字だけ(状態にかかわらず) */
+/* 種類「その他」は、二日酔いなどの書き込み用。状態にかかわらず、種類の色(初期値は JINIS より薄い水色)を
+   白を混ぜずにそのまま薄く塗り、枠なし・小さめの文字(2026-10-16 に塗らない → 薄い水色に) */
 .calendar .lesson.plain,
 .calendar .lesson.plain.confirmed,
 .calendar .lesson.plain.tentative,
 .calendar .lesson.plain.cancelled {
-  background: transparent;
+  background: var(--type-color);
   outline: none;
   box-shadow: none;
   color: var(--text);
