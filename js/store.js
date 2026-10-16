@@ -31,7 +31,7 @@ const DEFAULT_TYPES = [
   { id: 'practice', name: '練習',     color: '#9edbd2', countInTotal: false },
   { id: 'live',     name: 'ライブ',   color: '#d9c2f0', countInTotal: false },
   { id: 'fishing',  name: '釣り',     color: '#a9c8ee', countInTotal: false },   // 2026-10-16 に追加
-  { id: 'other',    name: 'その他',   color: '#e2f4fc', countInTotal: false },   // 2026-10-16 に灰色(#d9d9d9)から、JINIS より薄い水色に
+  { id: 'other',    name: 'その他',   color: '#c4e8f8', countInTotal: false },   // 2026-10-16 に灰色(#d9d9d9)から水色に。表では半透明(60%)で塗るので、JINIS より薄く見える
 ];
 
 // Numbers で使っていた色(2026-10-16 から初期値。設定画面の「Numbers と同じ色にする」でも使う)
@@ -81,7 +81,7 @@ export async function getTypes() {
 
 // あとから増えた種類(2026-10-16 の「ライブ」)を、保存済みの種類にも1回だけ足す
 // (一度足したら記録するので、本人が設定で削除したらもう足さない)
-const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2', 'fishing', 'other-lightblue', 'jinis-thu-deeper'];
+const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2', 'fishing', 'other-lightblue', 'jinis-thu-deeper', 'other-translucent'];
 // 色を変える引き継ぎ:保存済みの色がこれまでの初期の色のままなら、新しい色にする(自分で選んだ色は変えない)
 const COLOR_MIGRATIONS = {
   'home-softer': { id: 'home', from: ['#ade467', '#4caf50'], to: '#c9eda0' },
@@ -89,6 +89,7 @@ const COLOR_MIGRATIONS = {
   'other-lightblue': { id: 'other', from: ['#d9d9d9', '#9e9e9e'], to: '#e2f4fc' },
   // weekday があるときは、その曜日の色(weekdayColors)を変える
   'jinis-thu-deeper': { id: 'jinis', weekday: 4, from: ['#cbf0ff'], to: '#9fdcf7' },
+  'other-translucent': { id: 'other', from: ['#e2f4fc', '#d9d9d9', '#9e9e9e'], to: '#c4e8f8' },
 };
 async function addNewDefaultTypes(saved) {
   const done = (await db.getSetting('typeMigrations')) || [];

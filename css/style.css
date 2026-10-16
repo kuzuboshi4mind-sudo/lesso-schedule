@@ -1293,12 +1293,13 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 .legend-lesson.lesson { --pastel: 74%; --pastel-tentative: 40%; }
 
 /* 種類「その他」は、二日酔いなどの書き込み用。状態にかかわらず、種類の色(初期値は JINIS より薄い水色)を
-   白を混ぜずにそのまま薄く塗り、枠なし・小さめの文字(2026-10-16 に塗らない → 薄い水色に) */
+   半透明(60%)で塗り、下のしま模様や土日の色が透けて見えるようにする。枠なし・小さめの文字
+   (2026-10-16 に 塗らない → 薄い水色 → 半透明の薄い水色) */
 .calendar .lesson.plain,
 .calendar .lesson.plain.confirmed,
 .calendar .lesson.plain.tentative,
 .calendar .lesson.plain.cancelled {
-  background: var(--type-color);
+  background: color-mix(in srgb, var(--type-color) 60%, transparent);
   outline: none;
   box-shadow: none;
   color: var(--text);
