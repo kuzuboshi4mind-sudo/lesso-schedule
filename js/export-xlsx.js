@@ -239,12 +239,17 @@ async function addMonthSheet(workbook, year, month, common) {
   };
   for (const row of s.rows) summaryRow(row.type.name, row.type.color, row, false);
   summaryRow('レッスン合計', null, s.total, true);
-  // レッスン以外(ライブ・サウナ・釣りなど):種類ごとの件数と時間(合計には入れない)
-  if (s.others.length) {
+  // 練習と、レッスン以外(ライブ・サウナ・釣りなど):種類ごとの件数と時間(合計には入れない)
+  const sections = [
+    ['練習(合計に入れない)', s.practice ? [s.practice] : []],
+    ['レッスン以外(合計に入れない)', s.others],
+  ];
+  for (const [heading, list] of sections) {
+    if (!list.length) continue;
     r += 2;
-    ws.getRow(r).getCell(2).value = 'レッスン以外(合計に入れない)';
+    ws.getRow(r).getCell(2).value = heading;
     ws.getRow(r).getCell(2).font = { bold: true, size: 10 };
-    for (const o of s.others) {
+    for (const o of list) {
       r++;
       const row = ws.getRow(r);
       row.getCell(2).value = o.type.name;

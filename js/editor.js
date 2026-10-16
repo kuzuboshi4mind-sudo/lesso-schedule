@@ -31,6 +31,8 @@ const f = {
   statuses: document.getElementById('lesson-statuses'),
   types: document.getElementById('lesson-types'),
   memo: document.getElementById('lesson-memo'),
+  memoLabel: document.getElementById('lesson-memo-label'),
+  memoHint: document.getElementById('lesson-memo-hint'),
   error: document.getElementById('lesson-error'),
   recurringInfo: document.getElementById('lesson-recurring-info'),
   repeatField: document.getElementById('repeat-field'),
@@ -44,6 +46,9 @@ let editing = null;   // 編集中のレッスン(新規なら id なし)
 let onChanged = () => {};
 let studentNames = []; // 前に入れた名前(候補用)
 let studentMemos = []; // 生徒メモ(名前の下に出す用)
+let typeList = [];     // 種類の一覧(メモの欄を生徒メモにするか決める用)
+let memoMode = 'lesson';   // 'student'=メモの欄は生徒メモ、'lesson'=この予定だけのメモ
+let memoDirty = false;     // メモの欄を手で直したか(直したあとは自動で入れ替えない)
 
 // 6:00〜23:45 を15分刻みで選べるようにする
 for (let m = START_HOUR * 60; m < DAY_END; m += 15) {
@@ -126,6 +131,7 @@ for (const st of store.STATUSES) {
 // 種類(色つき)のボタンを並べる
 async function renderTypeChips() {
   const types = await store.getTypes();
+  typeList = types;
   f.types.innerHTML = types.map(t =>
     `<label class="chip type-chip" style="--type-color:${t.color};--type-text:${textColorFor(t.color)}">
       <input type="radio" name="typeId" value="${escapeHtml(t.id)}"><span>${escapeHtml(t.name)}</span>
@@ -138,11 +144,45 @@ async function loadStudentNames() {
 }
 
 // 名前の欄の生徒に生徒メモがあれば、名前の下に出す
+// (メモの欄が生徒メモになっているときは、同じ内容なので出さない)
 function renderStudentMemo() {
-  const memo = studentMemos.find(s => s.name === f.student.value.trim())?.memo;
+  refreshMemoField();
+  const memo = memoMode === 'lesson' && studentMemos.find(s => s.name === f.student.value.trim())?.memo;
   f.studentMemo.hidden = !memo;
   f.studentMemo.textContent = memo ? `📝 ${memo}` : '';
 }
+
+// ---- メモの欄:レッスンの予定なら「生徒メモ」と同じもの(2026-10-16)----
+// 名前があり、集計に入れる種類(レッスン)で、状態が「なし(自分の予定)」でないとき、メモの欄は生徒メモになる。
+// 生徒メモが空で、この予定だけのメモがあるときは、それを入れておく(保存すると生徒メモに移る)
+function wantedMemoMode() {
+  const name = f.student.value.trim();
+  const typeId = form.querySelector('input[name="typeId"]:checked')?.value;
+  const status = form.querySelector('input[name="status"]:checked')?.value;
+  const type = typeList.find(t => t.id === typeId);
+  return name && type?.countInTotal && status !== 'none' ? 'student' : 'lesson';
+}
+function studentMemoOf(name) {
+  return studentMemos.find(s => s.name === name)?.memo || '';
+}
+function memoFor(mode) {
+  const own = editing?.memo || '';
+  if (mode === 'lesson') return own;
+  const shared = studentMemoOf(f.student.value.trim());
+  return shared && own && !shared.includes(own) ? `${shared}\n${own}` : (shared || own);
+}
+function refreshMemoField() {
+  const mode = wantedMemoMode();
+  const changed = mode !== memoMode;
+  memoMode = mode;
+  f.memoLabel.textContent = mode === 'student' ? '生徒メモ(希望の曜日・時間、注文など)' : 'メモ(この予定だけ)';
+  f.memoHint.hidden = mode !== 'student';
+  if (!memoDirty || changed) { f.memo.value = memoFor(mode); memoDirty = false; }
+}
+f.memo.addEventListener('input', () => { memoDirty = true; });
+form.addEventListener('change', e => {
+  if (e.target.name === 'typeId' || e.target.name === 'status') renderStudentMemo();
+});
 
 function renderSuggest() {
   const text = f.student.value.trim();
@@ -189,8 +229,6 @@ async function openLesson(lesson) {
   f.date.value = lesson.date;
   f.start.value = lesson.start;
   f.student.value = lesson.student;
-  renderStudentMemo();
-  f.memo.value = lesson.memo || '';
   form.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
   // 長さが選択肢にないとき(長い予定など)は「終了時刻で指定」にする
   if (durations.includes(lesson.duration)) check('duration', lesson.duration);
@@ -201,6 +239,9 @@ async function openLesson(lesson) {
   check('typeId', lesson.typeId);
   check('status', lesson.status || 'tentative');
   if (!form.querySelector('input[name="typeId"]:checked')) form.querySelector('input[name="typeId"]').checked = true;
+  memoMode = null;
+  memoDirty = false;
+  renderStudentMemo();
   f.error.textContent = '';
   f.del.hidden = !lesson.id;
   // 固定枠から入った予定なら説明を出し、「くり返し」の欄はかくす
@@ -231,7 +272,10 @@ form.addEventListener('submit', async e => {
   if (!(duration > 0)) { f.error.textContent = picked === 'end' ? '終了時刻を開始より後にしてください' : '長さを選んでください'; return; }
   if (toMinutes(start) + duration > DAY_END) { f.error.textContent = '24:00 を過ぎてしまいます。開始時刻か長さを変えてください'; return; }
 
-  const values = { ...editing, date, start, duration, typeId, status, student: f.student.value.trim(), memo: f.memo.value.trim() };
+  const memoText = f.memo.value.trim();
+  const sharedMemo = wantedMemoMode() === 'student';
+  // レッスンの予定のメモは生徒メモに入れる(予定そのもののメモは空にする)
+  const values = { ...editing, date, start, duration, typeId, status, student: f.student.value.trim(), memo: sharedMemo ? '' : memoText };
   if (store.isOccurrenceId(editing.id)) {
     // 固定枠の予定:この日だけ変えるか、この日以降の固定枠を変えるか
     const scope = await askScope('固定枠の予定を変更', `${store.slotLabel(editing.slot)} の固定枠です。どちらを変えますか?`, [
@@ -247,6 +291,10 @@ form.addEventListener('submit', async e => {
     await store.addSlot(values, f.repeatEnd.value || null, f.repeat.value);
   } else {
     await store.saveLesson(values);
+  }
+  if (sharedMemo && memoText !== studentMemoOf(values.student)) {
+    const current = studentMemos.find(s => s.name === values.student);
+    await store.saveStudent({ id: current?.id, name: values.student, memo: memoText });
   }
   // 次に入れるときの初期値(長い予定は30分に戻す)
   store.setLastInput({ typeId, duration: durations.includes(duration) ? duration : 30, status });
