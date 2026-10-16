@@ -107,7 +107,7 @@ export function updateSummary(year, month, lessons, types, rules) {
       </tr></tbody>
     </table>` : ''}
     ${s.others.length ? `
-    <h3 class="summary-sub">レッスン以外(合計には入れていません)</h3>
+    <h3 class="summary-sub">プライベート(合計には入れていません)</h3>
     <table class="summary-table">
       <thead><tr><th scope="col">種類</th><th scope="col">件数</th><th scope="col">時間</th></tr></thead>
       <tbody>${s.others.map(o => `<tr>
@@ -118,7 +118,7 @@ export function updateSummary(year, month, lessons, types, rules) {
     <p class="sheet-note">
       レッスンの合計に入るのは「確約」だけです。「仮」は参考として別に数えています。<br>
       キャンセル・「なし(自分の予定)」・集計に入れない種類の予定(この月は${s.excluded}件)はレッスンの合計に入れていません。<br>
-      練習と、レッスン以外の種類(ライブ・サウナ・釣りなど)は、キャンセル以外を種類ごとに数えて、別の表に出しています。<br>
+      練習と、プライベートの種類(ライブ・サウナ・釣りなど)は、キャンセル以外を種類ごとに数えて、別の表に出しています。<br>
       時間数は設定画面の換算表で数えます(換算表にない長さは 分÷60)。
     </p>`;
 }

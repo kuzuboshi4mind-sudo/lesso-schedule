@@ -81,7 +81,7 @@ export async function getTypes() {
 
 // あとから増えた種類(2026-10-16 の「ライブ」)を、保存済みの種類にも1回だけ足す
 // (一度足したら記録するので、本人が設定で削除したらもう足さない)
-const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2', 'fishing', 'other-lightblue', 'jinis-thu-deeper', 'other-translucent'];
+const TYPE_MIGRATIONS = ['live', 'home-softer', 'home-soft2', 'fishing', 'other-lightblue', 'jinis-thu-deeper', 'other-translucent', 'private-uncounted'];
 // 色を変える引き継ぎ:保存済みの色がこれまでの初期の色のままなら、新しい色にする(自分で選んだ色は変えない)
 const COLOR_MIGRATIONS = {
   'home-softer': { id: 'home', from: ['#ade467', '#4caf50'], to: '#c9eda0' },
@@ -91,12 +91,19 @@ const COLOR_MIGRATIONS = {
   'jinis-thu-deeper': { id: 'jinis', weekday: 4, from: ['#cbf0ff'], to: '#9fdcf7' },
   'other-translucent': { id: 'other', from: ['#e2f4fc', '#d9d9d9', '#9e9e9e'], to: '#c4e8f8' },
 };
+// プライベートの種類は、保存済みの設定で「集計に入れる」になっていても1回だけ「入れない」に戻す
+// (2026-10-16:サウナ・練習がレッスンの合計に入っていたため。あとで設定から入れ直すことはできる)
+const UNCOUNT_MIGRATIONS = { 'private-uncounted': ['sauna', 'practice', 'live', 'fishing', 'other'] };
 async function addNewDefaultTypes(saved) {
   const done = (await db.getSetting('typeMigrations')) || [];
   const todo = TYPE_MIGRATIONS.filter(id => !done.includes(id));
   if (!todo.length) return saved;
   const types = [...saved];
   for (const id of todo) {
+    if (UNCOUNT_MIGRATIONS[id]) {
+      types.forEach((t, i) => { if (UNCOUNT_MIGRATIONS[id].includes(t.id) && t.countInTotal) types[i] = { ...t, countInTotal: false }; });
+      continue;
+    }
     const recolor = COLOR_MIGRATIONS[id];
     if (recolor) {
       const t = types.find(x => x.id === recolor.id);

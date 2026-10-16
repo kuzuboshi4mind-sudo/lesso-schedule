@@ -242,7 +242,7 @@ async function addMonthSheet(workbook, year, month, common) {
   // 練習と、レッスン以外(ライブ・サウナ・釣りなど):種類ごとの件数と時間(合計には入れない)
   const sections = [
     ['練習(合計に入れない)', s.practice ? [s.practice] : []],
-    ['レッスン以外(合計に入れない)', s.others],
+    ['プライベート(合計に入れない)', s.others],
   ];
   for (const [heading, list] of sections) {
     if (!list.length) continue;
