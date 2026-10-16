@@ -125,7 +125,6 @@ function lessonBlock(lesson, type, pos, solo = false) {
   const shortDur = fill ? `<small class="lesson-short-dur">${lesson.duration}</small>` : '';
   // 2行目以降(30分ごと)。最後の行が30分に満たないとき(45分の2行目など)は、
   // その行を残りの分の高さにして、文字も小さくして枠の中に収める。
-  // 行の低いスマホでは、その行を出さずに名前の横に「45分」を小さく添える(css の .lesson-part-dur)
   const rows = fill ? 1 : Math.max(1, Math.ceil(lesson.duration / 30));
   const extra = [];
   for (let i = 1; i < rows; i++) {
@@ -136,15 +135,13 @@ function lessonBlock(lesson, type, pos, solo = false) {
       ? `<span class="lesson-line part" style="--part:${part}">${text}</span>`
       : `<span class="lesson-line">${text}</span>`);
   }
-  const partDur = !fill && rows === 2 && lesson.duration % 30 !== 0
-    ? `<small class="lesson-part-dur">${lesson.duration}分</small>` : '';
   const tip = `${STATUS_LABEL[status] ?? ''} ${lesson.start}〜${end}(${lesson.duration}分) ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
   // 文字色は確約(濃い色の上)だけ背景に合わせて決める。仮・キャンセルは CSS で決める
   const textColor = '';
   return `<button type="button" class="lesson ${status}${type?.id === 'other' ? ' plain' : ''}${type?.countInTotal ? ' counted' : ''}${fill ? ' fill' : lesson.duration <= 20 ? ' short' : ''}${lesson.duration <= 30 ? ' half' : ''}" data-id="${escapeHtml(lesson.id)}"
     title="${escapeHtml(tip)}"
     style="--offset:${fill ? 0 : offset};--dur:${fill ? 30 : lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
-    <span class="lesson-name">${label}${shortDur}${partDur}</span>${extra.join('')}${memoMark}${repeatMark}
+    <span class="lesson-name">${label}${shortDur}</span>${extra.join('')}${memoMark}${repeatMark}
   </button>`;
 }
 

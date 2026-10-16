@@ -1197,10 +1197,15 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
   line-height: calc(var(--part) / 30 * var(--row));
   font-size: min(0.85em, calc(var(--part) / 30 * var(--row) * 0.85));
 }
-.lesson-part-dur { display: none; font-size: 0.7em; font-weight: 500; margin-left: 2px; opacity: 0.85; }
+/* スマホは行が低いので、名前の下の「45分」は読める大きさ(8px)より小さくしない。
+   名前の横には添えない(長い名前だと見切れるため。2026-10-16) */
 @media (max-width: 600px), (max-height: 500px) {
-  .calendar .lesson .lesson-line.part { display: none; }
-  .calendar .lesson .lesson-part-dur { display: inline; }
+  .calendar .lesson .lesson-line.part {
+    font-size: max(8px, calc(var(--part) / 30 * var(--row) * 0.95));
+    line-height: 1;
+    margin-top: -1px;   /* 枠の下で切れないよう少し上へ */
+    overflow: visible;
+  }
 }
 /* 仮:薄い色+点線(確約は濃い色で印なし) */
 .calendar .lesson.tentative { background: color-mix(in srgb, var(--type-color) 45%, #ffffff); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
