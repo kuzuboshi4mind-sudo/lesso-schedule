@@ -1191,6 +1191,17 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
   font-weight: 600;
 }
 .calendar .lesson .lesson-line { font-weight: 500; }
+/* 30分に満たない最後の行(45分の「45分」など):残りの高さに合わせて文字を小さくし、枠の中に収める */
+.calendar .lesson .lesson-line.part {
+  height: calc(var(--part) / 30 * var(--row));
+  line-height: calc(var(--part) / 30 * var(--row));
+  font-size: min(0.85em, calc(var(--part) / 30 * var(--row) * 0.85));
+}
+.lesson-part-dur { display: none; font-size: 0.7em; font-weight: 500; margin-left: 2px; opacity: 0.85; }
+@media (max-width: 600px), (max-height: 500px) {
+  .calendar .lesson .lesson-line.part { display: none; }
+  .calendar .lesson .lesson-part-dur { display: inline; }
+}
 /* 仮:薄い色+点線(確約は濃い色で印なし) */
 .calendar .lesson.tentative { background: color-mix(in srgb, var(--type-color) 45%, #ffffff); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
 .calendar .lesson.tentative .lesson-name { font-weight: 600; }

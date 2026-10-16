@@ -123,21 +123,28 @@ function lessonBlock(lesson, type, pos, solo = false) {
   // 15分・20分の予定が1マスに1件だけのときは、Numbers のようにマスいっぱいに塗り、長さを小さく添える
   const fill = solo && lesson.duration < 30;
   const shortDur = fill ? `<small class="lesson-short-dur">${lesson.duration}</small>` : '';
-  // 2行目以降(30分ごと)
-  const rows = fill ? 1 : Math.max(1, Math.ceil((offset + lesson.duration) / 30));
+  // 2行目以降(30分ごと)。最後の行が30分に満たないとき(45分の2行目など)は、
+  // その行を残りの分の高さにして、文字も小さくして枠の中に収める。
+  // 行の低いスマホでは、その行を出さずに名前の横に「45分」を小さく添える(css の .lesson-part-dur)
+  const rows = fill ? 1 : Math.max(1, Math.ceil(lesson.duration / 30));
   const extra = [];
   for (let i = 1; i < rows; i++) {
     const text = i === 1 && lesson.duration % 30 !== 0 ? `${lesson.duration}分`
       : i === 1 && lesson.duration > 120 ? `〜${end}` : name;
-    extra.push(`<span class="lesson-line">${text}</span>`);
+    const part = lesson.duration - i * 30;
+    extra.push(part < 30
+      ? `<span class="lesson-line part" style="--part:${part}">${text}</span>`
+      : `<span class="lesson-line">${text}</span>`);
   }
+  const partDur = !fill && rows === 2 && lesson.duration % 30 !== 0
+    ? `<small class="lesson-part-dur">${lesson.duration}分</small>` : '';
   const tip = `${STATUS_LABEL[status] ?? ''} ${lesson.start}〜${end}(${lesson.duration}分) ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
   // 文字色は確約(濃い色の上)だけ背景に合わせて決める。仮・キャンセルは CSS で決める
   const textColor = '';
   return `<button type="button" class="lesson ${status}${type?.id === 'other' ? ' plain' : ''}${type?.countInTotal ? ' counted' : ''}${fill ? ' fill' : lesson.duration <= 20 ? ' short' : ''}${lesson.duration <= 30 ? ' half' : ''}" data-id="${escapeHtml(lesson.id)}"
     title="${escapeHtml(tip)}"
     style="--offset:${fill ? 0 : offset};--dur:${fill ? 30 : lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
-    <span class="lesson-name">${label}${shortDur}</span>${extra.join('')}${memoMark}${repeatMark}
+    <span class="lesson-name">${label}${shortDur}${partDur}</span>${extra.join('')}${memoMark}${repeatMark}
   </button>`;
 }
 
