@@ -1306,3 +1306,27 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 }
 .calendar .lesson.plain .lesson-name,
 .calendar .lesson.plain .lesson-line { font-weight: 400; }
+
+/* 長時間の予定(60分より長い):先頭に開始時刻、末尾に終了時刻(2026-10-16) */
+.calendar .lesson .lesson-line.lesson-time { font-size: 0.82em; font-weight: 500; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.calendar .lesson .lesson-line.lesson-time.part { font-size: min(0.82em, calc(var(--part) / 30 * var(--row) * 0.85)); }
+@media (max-width: 600px), (max-height: 500px) {
+  .calendar .lesson .lesson-line.lesson-time.part { font-size: max(8px, calc(var(--part) / 30 * var(--row) * 0.95)); }
+}
+
+/* ダブルタップでマスに直接書き込む入力欄(js/inline-edit.js)。iPhone で画面が拡大されないよう文字は 16px */
+.inline-edit {
+  position: fixed;
+  z-index: 50;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 6px;
+  font: 600 16px/1 inherit;
+  font-family: inherit;
+  color: #1a1a1a;
+  background: #fffbe6;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  outline: none;
+}

@@ -11,6 +11,7 @@ import { initRecurring } from './recurring.js';
 import { initStudents } from './students.js';
 import { initLineShare } from './line-share.js';
 import { initSummary, updateSummary } from './summary.js';
+import { initInlineEdit, editLessonInline, editCellInline } from './inline-edit.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -19,12 +20,13 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '長い名前でも45分を名前の下に(2026-10-16)';
+const APP_VERSION = 'ダブルタップで直接入力・長い予定に開始と終了の時刻(2026-10-16)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
 let current = readMonthFromUrl() || thisMonth();
 let dayNotes = {};
+let shownLessons = [];   // 表に出している予定(ダブルタップの直接入力で使う)
 
 // 表示のしかた:'month'=月の表、'day'=1日ビュー(スマホは開いた瞬間に1日ビュー。今日の1日を大きく)
 const phoneQuery = window.matchMedia('(max-width: 600px), (max-height: 500px)');
@@ -81,6 +83,7 @@ async function show({ keepScroll = false } = {}) {
   showMonthStatus(tentative);
   updateStudentsBadge();
   dayNotes = notes;
+  shownLessons = lessons;
   const { scrollLeft, scrollTop } = scroller;
   renderCalendar(table, year, month, { lessons, dayNotes, types, onlyDate: dayView ? selectedDate : null });
   refreshZoom();
@@ -189,19 +192,38 @@ scroller.addEventListener('touchend', e => {
 
 // 表のタップ:予定のブロック → 編集、空いたマス → 新規、「予定」の行 → 日ごとのメモ
 // (長押しで選択中のときは、タップは選択の操作になる)
+// ダブルタップ:マスや予定に直接文字を入力する(js/inline-edit.js)。
+// 1回目のタップは、2回目が来ないと決まってから(DOUBLE_TAP_MS 後に)入力画面を開く
+const DOUBLE_TAP_MS = 280;
+let pendingTap = null;    // { key, timer }
 table.addEventListener('click', e => {
   if (handleTap(e)) return;
-  const lesson = e.target.closest('.lesson');
-  if (lesson) return openExistingLesson(lesson.dataset.id);
   const memo = e.target.closest('th.day-memo');
   if (memo) return openDayNote(memo.dataset.date, dayNotes[memo.dataset.date]);
+  const lessonEl = e.target.closest('.lesson');
   const cell = e.target.closest('td[data-date]');
-  if (cell) return openNewLesson(cell.dataset.date, cell.dataset.time);
+  if (!lessonEl && !cell) return;
+  const key = lessonEl ? `L:${lessonEl.dataset.id}` : `C:${cell.dataset.date} ${cell.dataset.time}`;
+  if (pendingTap && pendingTap.key === key) {
+    // 2回目のタップ → 直接入力
+    clearTimeout(pendingTap.timer);
+    pendingTap = null;
+    const lesson = lessonEl && shownLessons.find(l => l.id === lessonEl.dataset.id);
+    if (lesson) editLessonInline(lessonEl, lesson);
+    else if (cell && !lessonEl) editCellInline(cell, cell.dataset.date, cell.dataset.time);
+    return;
+  }
+  if (pendingTap) { clearTimeout(pendingTap.timer); pendingTap.run(); }
+  const run = lessonEl
+    ? () => openExistingLesson(lessonEl.dataset.id)
+    : () => openNewLesson(cell.dataset.date, cell.dataset.time);
+  pendingTap = { key, run, timer: setTimeout(() => { pendingTap = null; run(); }, DOUBLE_TAP_MS) };
 });
 
 // 保存・削除したら、スクロール位置はそのままで表を描き直す
 setOnChanged(() => show({ keepScroll: true }));
 initSelection({ table, scroller, onChanged: () => show({ keepScroll: true }) });
+initInlineEdit({ scroller, onChanged: () => show({ keepScroll: true }) });
 initSettings({ onChanged: () => show({ keepScroll: true }) });
 initZoom({ table, scroller });
 initTrashBackup({ getMonth: () => current, onChanged: () => show({ keepScroll: true }) });

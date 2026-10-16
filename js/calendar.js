@@ -127,13 +127,15 @@ function lessonBlock(lesson, type, pos, solo = false) {
   // その行を残りの分の高さにして、文字も小さくして枠の中に収める。
   const rows = fill ? 1 : Math.max(1, Math.ceil(lesson.duration / 30));
   const extra = [];
-  for (let i = 1; i < rows; i++) {
-    const text = i === 1 && lesson.duration % 30 !== 0 ? `${lesson.duration}分`
+  // 長時間の予定(60分より長い=3行以上):先頭の行に開始時刻、末尾の行に終了時刻、間の行に名前
+  const long = rows >= 3;
+  for (let i = long ? 2 : 1; i < rows; i++) {
+    const text = long ? (i === rows - 1 ? `〜${end}` : name)
+      : i === 1 && lesson.duration % 30 !== 0 ? `${lesson.duration}分`
       : i === 1 && lesson.duration > 120 ? `〜${end}` : name;
     const part = lesson.duration - i * 30;
-    extra.push(part < 30
-      ? `<span class="lesson-line part" style="--part:${part}">${text}</span>`
-      : `<span class="lesson-line">${text}</span>`);
+    const cls = `lesson-line${part < 30 ? ' part' : ''}${long && i === rows - 1 ? ' lesson-time' : ''}`;
+    extra.push(`<span class="${cls}"${part < 30 ? ` style="--part:${part}"` : ''}>${text}</span>`);
   }
   const tip = `${STATUS_LABEL[status] ?? ''} ${lesson.start}〜${end}(${lesson.duration}分) ${type ? type.name : ''}${lesson.memo ? '\n' + lesson.memo : ''}`;
   // 文字色は確約(濃い色の上)だけ背景に合わせて決める。仮・キャンセルは CSS で決める
@@ -141,7 +143,7 @@ function lessonBlock(lesson, type, pos, solo = false) {
   return `<button type="button" class="lesson ${status}${type?.id === 'other' ? ' plain' : ''}${type?.countInTotal ? ' counted' : ''}${fill ? ' fill' : lesson.duration <= 20 ? ' short' : ''}${lesson.duration <= 30 ? ' half' : ''}" data-id="${escapeHtml(lesson.id)}"
     title="${escapeHtml(tip)}"
     style="--offset:${fill ? 0 : offset};--dur:${fill ? 30 : lesson.duration};--type-color:${color};${textColor}left:${pos.lane * width}%;width:${width}%">
-    <span class="lesson-name">${label}${shortDur}</span>${extra.join('')}${memoMark}${repeatMark}
+    ${long ? `<span class="lesson-line lesson-time">${lesson.start}〜</span>` : ''}<span class="lesson-name">${label}${shortDur}</span>${extra.join('')}${memoMark}${repeatMark}
   </button>`;
 }
 
