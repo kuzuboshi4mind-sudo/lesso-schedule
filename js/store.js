@@ -756,6 +756,9 @@ export async function getStudents() {
 export async function getStudentOverview() {
   const today = localToday();
   const from = addDays(today, -180), to = addDays(today, 92);
+  // 連絡が必要かどうか・仮の予定の一覧は、今月と来月の分だけで見る(2か月以上先の予定を送ることはまずないため。2026-10-19)
+  const [ty, tm] = today.split('-').map(Number);
+  const nextMonthEnd = `${tm === 12 ? ty + 1 : ty}-${String(tm === 12 ? 1 : tm + 1).padStart(2, '0')}-31`;
   const [students, allLessons, occurrences, allSlots, types, hidden, extras] = await Promise.all([
     db.listStudents(), db.listLessons(from, to), getOccurrences(today, to), db.listSlots(), getTypes(), getHiddenStudents(),
     getStudentExtras(),
@@ -790,7 +793,7 @@ export async function getStudentOverview() {
       e.next = { date: l.date, start: l.start };
     }
     if (l.date >= today && status !== 'cancelled') e.count++;
-    if (l.date >= today && status === 'tentative') e.tentative.push(l);
+    if (l.date >= today && l.date <= nextMonthEnd && status === 'tentative') e.tentative.push(l);
   }
   for (const sl of activeSlots) {
     const e = byName.get(sl.student);

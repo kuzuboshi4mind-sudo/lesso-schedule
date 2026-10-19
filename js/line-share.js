@@ -59,7 +59,8 @@ function dateLabel(date) {
   return `${m}/${d}(${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`;
 }
 
-// 期間の選択肢:今月(今日から月末まで)・来月・再来月・今日から3か月
+// 期間の選択肢:今月と来月(今日から来月末まで)・今月(今日から月末まで)・来月
+// (2か月以上先の予定を送ることはまずないので、来月まで。2026-10-19)
 function rangeOptions() {
   const now = new Date();
   const today = ymd(now);
@@ -72,12 +73,11 @@ function rangeOptions() {
       periodText: `${first.getMonth() + 1}月`,
     };
   };
-  const three = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate() - 1);
+  const m0 = month(0), m1 = month(1);
   return [
-    { ...month(0), label: `今月(${now.getMonth() + 1}月・今日から)` },
-    { ...month(1), label: `来月(${month(1).label})` },
-    { ...month(2), label: `再来月(${month(2).label})` },
-    { value: 'next3', label: '今日から3か月', from: today, to: ymd(three), periodText: `${dateLabel(today)}〜${dateLabel(ymd(three))}` },
+    { value: 'both', label: `今月と来月(${m0.label}・${m1.label})`, from: today, to: m1.to, periodText: `${m0.label}・${m1.label}` },
+    { ...m0, label: `今月(${m0.label}・今日から)` },
+    { ...m1, label: `来月(${m1.label})` },
   ];
 }
 
@@ -97,11 +97,8 @@ export async function openLineShare(name, opts = {}) {
   range.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
   statusSel.value = 'tentative';
   template.value = await store.getLineTemplate();
-  // はじめに選ぶ期間:仮の予定がある一番近い月(なければ来月)
-  range.value = 'm1';
-  for (const o of options.slice(0, 3)) {
-    if ((await pickLessons(o)).length) { range.value = o.value; break; }
-  }
+  // はじめに選ぶ期間:今月と来月
+  range.value = 'both';
   await build();
   dialog.showModal();
   title.focus();
