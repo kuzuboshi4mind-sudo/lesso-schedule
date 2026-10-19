@@ -140,6 +140,8 @@
         <div id="student-suggest" class="suggest" hidden></div>
         <!-- その生徒の生徒メモ(あるときだけ出る) -->
         <p id="lesson-student-memo" class="student-memo-hint" hidden></p>
+        <!-- この生徒に今月・来月の予定を LINE で送る(名前があるときだけ出る) -->
+        <button type="button" id="lesson-line" class="btn btn-line" hidden>LINE で予定を送る</button>
       </div>
 
       <fieldset class="field">
@@ -352,18 +354,18 @@
       <button type="button" class="btn" data-close>閉じる</button>
     </div>
     <p id="line-to" class="line-to"></p>
-    <div class="field-row">
-      <label class="field">
-        <span class="field-label">期間</span>
-        <select id="line-range"></select>
-      </label>
-      <label class="field">
-        <span class="field-label">送る予定</span>
-        <select id="line-status">
-          <option value="tentative">仮の予定だけ</option>
-          <option value="both">仮と確約</option>
-        </select>
-      </label>
+    <label class="field">
+      <span class="field-label">期間</span>
+      <select id="line-range"></select>
+    </label>
+    <div class="field">
+      <span class="field-label">送る予定(チェックした予定が文面に入ります。確約の予定も選べます)</span>
+      <ul id="line-pick" class="tentative-list"></ul>
+      <div class="button-row">
+        <button type="button" id="line-pick-tentative" class="btn btn-small">仮だけ選ぶ</button>
+        <button type="button" id="line-pick-all" class="btn btn-small">すべて選ぶ</button>
+        <button type="button" id="line-pick-none" class="btn btn-small">選択を外す</button>
+      </div>
     </div>
     <label class="field">
       <span class="field-label">文面(送る前にここで直せます)</span>

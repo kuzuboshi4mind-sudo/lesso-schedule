@@ -13,7 +13,7 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const dialog = document.getElementById('line-dialog');
 const title = document.getElementById('line-title');
 const range = document.getElementById('line-range');
-const statusSel = document.getElementById('line-status');
+const pick = document.getElementById('line-pick');
 const text = document.getElementById('line-text');
 const count = document.getElementById('line-count');
 const openLink = document.getElementById('line-open');
@@ -24,12 +24,25 @@ const to = document.getElementById('line-to');
 let student = '';
 let types = [];
 let current = [];          // いまの文面に入っている予定
+let shown = [];            // 期間の中の予定(チェックの一覧に出しているもの)
+let checked = new Set();   // チェックした予定の id
+let seen = new Set();      // 一度一覧に出した予定の id(はじめのチェックを付けたかどうか)
+let focusId = null;        // 予定の入力画面から開いたときの、その予定(はじめからチェック)
 let onSent = () => {};
 
 export function initLineShare() {
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
   range.addEventListener('change', build);
-  statusSel.addEventListener('change', build);
+  pick.addEventListener('change', e => {
+    const box = e.target.closest('input[type=checkbox]');
+    if (!box) return;
+    if (box.checked) checked.add(box.value); else checked.delete(box.value);
+    writeText();
+  });
+  const setAll = test => { checked = new Set(shown.filter(test).map(l => l.id)); renderPick(); writeText(); };
+  document.getElementById('line-pick-tentative').addEventListener('click', () => setAll(l => (l.status || 'tentative') === 'tentative'));
+  document.getElementById('line-pick-all').addEventListener('click', () => setAll(() => true));
+  document.getElementById('line-pick-none').addEventListener('click', () => setAll(() => false));
   text.addEventListener('input', updateLink);
   copyBtn.addEventListener('click', copyText);
   // LINE を開いたら、送った印を付ける(リンクはそのまま LINE を開く)
@@ -85,6 +98,9 @@ function rangeOptions() {
 export async function openLineShare(name, opts = {}) {
   student = name;
   onSent = opts.onSent || (() => {});
+  focusId = opts.lessonId || null;
+  checked = new Set();
+  seen = new Set();
   const [t, extras] = await Promise.all([store.getTypes(), store.getStudentExtras()]);
   types = t;
   title.textContent = `${name}さんに LINE で送る`;
@@ -95,7 +111,6 @@ export async function openLineShare(name, opts = {}) {
     : '送り先の LINE での名前が未登録です。生徒の画面の「LINE での名前」に入れておくと、ここに出ます。';
   const options = rangeOptions();
   range.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-  statusSel.value = 'tentative';
   template.value = await store.getLineTemplate();
   // はじめに選ぶ期間:今月と来月
   range.value = 'both';
@@ -104,19 +119,42 @@ export async function openLineShare(name, opts = {}) {
   title.focus();
 }
 
-async function pickLessons(option) {
+// 期間の中の、仮と確約の予定(キャンセル・自分の予定は出さない)
+async function lessonsIn(option) {
   const lessons = await store.getStudentLessons(student, option.from, option.to);
-  const wanted = statusSel.value === 'both' ? ['tentative', 'confirmed'] : ['tentative'];
-  return lessons.filter(l => wanted.includes(l.status || 'tentative'));
+  return lessons.filter(l => ['tentative', 'confirmed'].includes(l.status || 'tentative'));
 }
 
-// 文面を作り直す
+// 期間を変えたとき:予定の一覧を作り直す(はじめて出す予定は、仮と、入力画面から開いた予定にチェック)
 async function build() {
   const option = rangeOptions().find(o => o.value === range.value);
-  const lessons = await pickLessons(option);
+  shown = await lessonsIn(option);
+  for (const l of shown) {
+    if (seen.has(l.id)) continue;
+    seen.add(l.id);
+    if ((l.status || 'tentative') === 'tentative' || l.id === focusId) checked.add(l.id);
+  }
+  renderPick();
+  writeText();
+}
+
+function renderPick() {
+  const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
+  pick.innerHTML = shown.length ? shown.map(l => `<li><label>
+      <input type="checkbox" value="${escapeHtml(l.id)}" ${checked.has(l.id) ? 'checked' : ''}>
+      ${dateLabel(l.date)} ${l.start}〜 ${l.duration}分 ${escapeHtml(typeName[l.typeId] || '')}${l.recurring ? ' ↻' : ''}
+      <span class="sent-mark">${(l.status || 'tentative') === 'confirmed' ? '確約' : '仮'}</span>
+    </label></li>`).join('') : '<li class="muted">この期間の予定はありません</li>';
+}
+
+// チェックした予定から文面を作る
+function writeText() {
+  const option = rangeOptions().find(o => o.value === range.value);
+  const lessons = shown.filter(l => checked.has(l.id));
   current = lessons;
   const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
-  const both = statusSel.value === 'both';
+  // 確約の予定を入れたときは、(仮)(確定)を付けて見分けられるようにする
+  const both = lessons.some(l => (l.status || 'tentative') === 'confirmed');
   const lines = lessons.map(l => {
     const end = fromMinutes(toMinutes(l.start) + l.duration);
     const place = typeName[l.typeId] ? ` ${typeName[l.typeId]}` : '';
@@ -129,7 +167,7 @@ async function build() {
     .replaceAll('{予定}', lines.length ? lines.join('\n') : '(この期間の予定はありません)');
   count.textContent = lessons.length
     ? `${lessons.length}件の予定を入れました。`
-    : `この期間に${both ? '' : '仮の'}予定がありません。期間や「送る予定」を変えてみてください。`;
+    : '送る予定にチェックを付けてください。';
   updateLink();
 }
 

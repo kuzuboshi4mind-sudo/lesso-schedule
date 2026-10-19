@@ -1,6 +1,7 @@
 // 予定の入力画面(レッスン)と、日ごとのメモの入力画面
 import * as store from './store.js';
 import { escapeHtml, toMinutes, fromMinutes, textColorFor, START_HOUR } from './calendar.js';
+import { openLineShare } from './line-share.js';
 
 const DAY_END = 24 * 60; // 24:00
 
@@ -33,6 +34,7 @@ const f = {
   memo: document.getElementById('lesson-memo'),
   memoLabel: document.getElementById('lesson-memo-label'),
   memoHint: document.getElementById('lesson-memo-hint'),
+  line: document.getElementById('lesson-line'),
   error: document.getElementById('lesson-error'),
   recurringInfo: document.getElementById('lesson-recurring-info'),
   repeatField: document.getElementById('repeat-field'),
@@ -147,6 +149,8 @@ async function loadStudentNames() {
 // (メモの欄が生徒メモになっているときは、同じ内容なので出さない)
 function renderStudentMemo() {
   refreshMemoField();
+  // レッスンの予定なら「LINE で予定を送る」を出す
+  f.line.hidden = memoMode !== 'student';
   const memo = memoMode === 'lesson' && studentMemos.find(s => s.name === f.student.value.trim())?.memo;
   f.studentMemo.hidden = !memo;
   f.studentMemo.textContent = memo ? `📝 ${memo}` : '';
@@ -180,6 +184,11 @@ function refreshMemoField() {
   if (!memoDirty || changed) { f.memo.value = memoFor(mode); memoDirty = false; }
 }
 f.memo.addEventListener('input', () => { memoDirty = true; });
+// この予定の生徒に、今月・来月の予定を LINE で送る(この予定は、確約でもはじめからチェック)
+f.line.addEventListener('click', () => {
+  const name = f.student.value.trim();
+  if (name) openLineShare(name, { lessonId: editing?.id });
+});
 form.addEventListener('change', e => {
   if (e.target.name === 'typeId' || e.target.name === 'status') renderStudentMemo();
 });
