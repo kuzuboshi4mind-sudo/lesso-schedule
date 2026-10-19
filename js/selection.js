@@ -4,7 +4,7 @@
 // ・選択中にタップ → そのマスだけを選択し直す
 // ・⇧(Shift)を押しながら長押し・タップ・クリック → 離れたマスを追加で選ぶ(複数選択)。
 //   もう一度 ⇧+タップすると、そのマスの選択を外す。キーボードがないときは操作バーの「⇧ 追加選択」を使う
-// ・下に出る操作バーで「文字を入力」「コピー」「貼り付け」「削除」
+// ・下に出る操作バーで「文字を入力」「切り取り」「コピー」「貼り付け」「削除」
 // ・「戻す」「やり直す」で、直前の操作を取り消す/もう一度行う
 // ・Mac のキー操作(選択中):矢印で移動、Shift+矢印で範囲、⌘A 全部、⌘C コピー、⌘X 切り取り、⌘V 貼り付け、
 //   delete 削除、return 編集(予定が1件なら入力画面、それ以外は文字を入力)、esc 選択をやめる
@@ -66,6 +66,7 @@ export function initSelection(opts) {
   });
 
   document.getElementById('sel-text').addEventListener('click', openTextInput);
+  document.getElementById('sel-cut').addEventListener('click', () => copySelection({ cut: true }));
   document.getElementById('sel-copy').addEventListener('click', () => copySelection());
   pasteBtn.addEventListener('click', pasteSelection);
   document.getElementById('sel-delete').addEventListener('click', deleteSelection);
