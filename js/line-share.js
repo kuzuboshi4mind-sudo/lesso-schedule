@@ -112,8 +112,10 @@ export async function openLineShare(name, opts = {}) {
   const options = rangeOptions();
   range.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
   template.value = await store.getLineTemplate();
-  // はじめに選ぶ期間:今月と来月
-  range.value = 'both';
+  // はじめに選ぶ期間:来月(入力画面から今月の予定を開いたときは、その予定が見えるよう「今月と来月」)
+  const m1 = options.find(o => o.value === 'm1');
+  const focus = focusId && (await lessonsIn(options[0])).find(l => l.id === focusId);
+  range.value = focus && focus.date < m1.from ? 'both' : 'm1';
   await build();
   dialog.showModal();
   title.focus();
@@ -153,13 +155,11 @@ function writeText() {
   const lessons = shown.filter(l => checked.has(l.id));
   current = lessons;
   const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
-  // 確約の予定を入れたときは、(仮)(確定)を付けて見分けられるようにする
-  const both = lessons.some(l => (l.status || 'tentative') === 'confirmed');
+  // 仮・確約の印は付けない(相手に「確定」と出ると不自然なため。2026-10-22)
   const lines = lessons.map(l => {
     const end = fromMinutes(toMinutes(l.start) + l.duration);
     const place = typeName[l.typeId] ? ` ${typeName[l.typeId]}` : '';
-    const mark = both ? ((l.status || 'tentative') === 'confirmed' ? '(確定)' : '(仮)') : '';
-    return `・${dateLabel(l.date)} ${l.start}〜${end}${place}${mark}`;
+    return `・${dateLabel(l.date)} ${l.start}〜${end}${place}`;
   });
   text.value = (template.value || store.DEFAULT_LINE_TEMPLATE)
     .replaceAll('{名前}', student)
