@@ -236,6 +236,23 @@
     </section>
 
     <section class="settings-section">
+      <h3>メモアプリとつなぐ</h3>
+      <p class="sheet-note">レッスンメモ(メモアプリ)と同じメールアドレスとパスワードでログインすると、生徒の画面に、その生徒の名前が入っているメモが「メモアプリの記録」として出ます(読むだけ。メモアプリの中身は変えません)。この端末で1回つなげば、次からは自動です。</p>
+      <p id="memo-link-status" class="sheet-note"></p>
+      <div id="memo-link-form">
+        <label class="field"><span class="field-label">メモアプリのメールアドレス</span>
+          <input type="email" id="memo-link-email" autocomplete="username" autocapitalize="off"></label>
+        <label class="field"><span class="field-label">パスワード</span>
+          <input type="password" id="memo-link-password" autocomplete="current-password"></label>
+      </div>
+      <p id="memo-link-error" class="form-error" role="alert"></p>
+      <div class="button-row">
+        <button type="button" id="memo-link-connect" class="btn btn-primary">つなぐ</button>
+        <button type="button" id="memo-link-disconnect" class="btn" hidden>つなぐのをやめる</button>
+      </div>
+    </section>
+
+    <section class="settings-section">
       <h3>Numbers に書き出す</h3>
       <p class="sheet-note">表を Excel 形式(.xlsx)のファイルにします。Numbers で開くと、今の Numbers と同じ形の表(色つき)と集計・生徒の一覧が出ます。月ごとに1枚のシートになります。</p>
       <div class="button-row">
@@ -340,6 +357,8 @@
         <span class="field-label">メモ(希望の曜日・時間、注文など)</span>
         <textarea id="student-memo" rows="6" placeholder="例:火・木の17時以降を希望&#10;発表会でショパンを弾きたい"></textarea>
       </label>
+      <!-- メモアプリの記録(その生徒の名前が入っている行。読むだけ) -->
+      <div id="student-memoapp" class="student-memoapp" hidden></div>
       <div id="student-info" class="student-info"></div>
       <div class="sheet-actions">
         <button type="button" id="student-delete" class="btn btn-danger">この生徒を削除</button>

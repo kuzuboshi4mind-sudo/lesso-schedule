@@ -1334,3 +1334,15 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
   outline: none;
 }
 #lesson-line { margin-top: 10px; width: 100%; }
+
+/* 生徒の画面の「メモアプリの記録」(js/students.js・js/memo-link.js) */
+.student-memoapp[hidden] { display: none; }
+.student-memoapp { margin: 4px 0 16px; padding: 10px 12px; border-radius: 10px; background: var(--memo, color-mix(in srgb, var(--accent) 8%, var(--surface))); }
+.student-memoapp h3 { margin: 0 0 6px; font-size: 0.95rem; color: var(--muted); }
+.memoapp-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.memoapp-list li { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); line-height: 1.45; }
+.memoapp-list li:last-child { border-bottom: none; }
+.memoapp-date { flex: none; min-width: 5.2em; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.memoapp-text { white-space: pre-wrap; word-break: break-word; }
+.memoapp-list li.is-done .memoapp-text { color: var(--muted); }
+#memo-link-form[hidden] { display: none; }

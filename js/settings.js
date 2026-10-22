@@ -2,6 +2,7 @@
 // 変更はその場で保存し、後ろの表にもすぐ反映する
 import * as store from './store.js';
 import { escapeHtml } from './calendar.js';
+import * as memoLink from './memo-link.js';
 
 // 色を選ぶときの見本(タップで選べる)。ここにない色は「ほかの色…」で自由に選べる
 const PALETTE = [
@@ -37,6 +38,7 @@ async function openSettings() {
   rules = structuredClone(rules);
   renderTypes();
   renderRules();
+  renderMemoLink();
   dialog.showModal();
   dialog.querySelector('h2').focus();
   dialog.scrollTop = 0;
@@ -201,3 +203,50 @@ async function addRule() {
   rules.push({ minutes: min, hours: Math.round(min / 60 * 100) / 100 });
   await saveRules();
 }
+
+// ---------------------------------------------------------
+// メモアプリとつなぐ(js/memo-link.js)
+// ---------------------------------------------------------
+const ml = {
+  status: document.getElementById('memo-link-status'),
+  form: document.getElementById('memo-link-form'),
+  email: document.getElementById('memo-link-email'),
+  password: document.getElementById('memo-link-password'),
+  error: document.getElementById('memo-link-error'),
+  connect: document.getElementById('memo-link-connect'),
+  disconnect: document.getElementById('memo-link-disconnect'),
+};
+
+export async function renderMemoLink() {
+  ml.error.textContent = '';
+  let email = null;
+  try { email = await memoLink.currentUser(); } catch (e) { ml.error.textContent = memoLink.errorText(e); }
+  ml.status.textContent = email ? `つないでいます:${email}` : 'まだつないでいません';
+  ml.form.hidden = !!email;
+  ml.connect.hidden = !!email;
+  ml.disconnect.hidden = !email;
+  ml.password.value = '';
+}
+
+ml.connect.addEventListener('click', async () => {
+  const email = ml.email.value.trim();
+  if (!email || !ml.password.value) { ml.error.textContent = 'メールアドレスとパスワードを入れてください'; return; }
+  ml.connect.disabled = true;
+  ml.error.textContent = '';
+  ml.status.textContent = 'つないでいます…';
+  try {
+    await memoLink.connect(email, ml.password.value);
+    await renderMemoLink();
+  } catch (e) {
+    ml.status.textContent = 'まだつないでいません';
+    ml.error.textContent = memoLink.errorText(e);
+  } finally {
+    ml.connect.disabled = false;
+    ml.password.value = '';
+  }
+});
+
+ml.disconnect.addEventListener('click', async () => {
+  await memoLink.disconnect();
+  await renderMemoLink();
+});

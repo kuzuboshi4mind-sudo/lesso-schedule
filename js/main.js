@@ -20,7 +20,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'LINE の文面に確定を出さない・はじめは来月(2026-10-22)';
+const APP_VERSION = 'メモアプリの記録を生徒の画面に(2026-10-22)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
