@@ -88,3 +88,30 @@ export function errorText(e) {
   if (code.includes('network') || e instanceof TypeError) return 'インターネットにつながっていないようです';
   return `つなげませんでした(${code || e?.message || e})`;
 }
+
+// 「メモアプリの記録」の欄を作る(生徒の画面・予定の入力画面で使う)
+// box:入れる場所、name:生徒の名前、stillCurrent:読み込み中に別の生徒に変わっていないか
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export async function renderInto(box, name, stillCurrent = () => true) {
+  if (!name || !wasConnected()) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = '<h3>メモアプリの記録</h3><p class="muted">読み込み中…</p>';
+  try {
+    const list = await memosFor(name);
+    if (!stillCurrent()) return;
+    if (!list) { box.innerHTML = '<h3>メモアプリの記録</h3><p class="muted">メモアプリにログインしていません。「⚙ 設定」→「メモアプリとつなぐ」からつないでください。</p>'; return; }
+    const shown = list.slice(0, 50);
+    const thisYear = new Date().getFullYear();
+    box.innerHTML = `<h3>メモアプリの記録(${list.length}件)</h3>` + (shown.length
+      ? `<ul class="memoapp-list">${shown.map(it => {
+        const d = new Date(it.t || 0);
+        const date = it.t ? `${d.getFullYear() !== thisYear ? `${d.getFullYear()}/` : ''}${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})` : '';
+        return `<li class="${it.done ? 'is-done' : ''}"><span class="memoapp-date">${date}</span><span class="memoapp-text">${it.done ? '✓ ' : ''}${esc(it.text)}</span></li>`;
+      }).join('')}</ul>${list.length > shown.length ? `<p class="muted">ほか ${list.length - shown.length}件(古いもの)</p>` : ''}`
+      : `<p class="muted">「${esc(name)}」が入っているメモはまだありません</p>`);
+  } catch (e) {
+    if (!stillCurrent()) return;
+    box.innerHTML = `<h3>メモアプリの記録</h3><p class="muted">${esc(errorText(e))}</p>`;
+  }
+}

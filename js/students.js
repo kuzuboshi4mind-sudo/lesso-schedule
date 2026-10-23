@@ -234,28 +234,8 @@ async function openStudent(student) {
 }
 
 // メモアプリの記録:その生徒の名前が入っているメモを、新しい順に出す(画面を開いてから読み込む)
-const WEEKDAYS_MEMO = ['日', '月', '火', '水', '木', '金', '土'];
-async function renderMemoApp(name) {
-  const box = document.getElementById('student-memoapp');
-  if (!name || !memoLink.wasConnected()) { box.hidden = true; return; }
-  box.hidden = false;
-  box.innerHTML = '<h3>メモアプリの記録</h3><p class="muted">読み込み中…</p>';
-  try {
-    const list = await memoLink.memosFor(name);
-    if (editing?.name !== name) return;   // 読み込み中に別の生徒を開いたとき
-    if (!list) { box.innerHTML = '<h3>メモアプリの記録</h3><p class="muted">メモアプリにログインしていません。「⚙ 設定」→「メモアプリとつなぐ」からつないでください。</p>'; return; }
-    const shown = list.slice(0, 50);
-    box.innerHTML = `<h3>メモアプリの記録(${list.length}件)</h3>` + (shown.length
-      ? `<ul class="memoapp-list">${shown.map(it => {
-        const d = new Date(it.t || 0);
-        const date = it.t ? `${d.getFullYear() !== new Date().getFullYear() ? `${d.getFullYear()}/` : ''}${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS_MEMO[d.getDay()]})` : '';
-        return `<li class="${it.done ? 'is-done' : ''}"><span class="memoapp-date">${date}</span><span class="memoapp-text">${it.done ? '✓ ' : ''}${escapeHtml(it.text)}</span></li>`;
-      }).join('')}</ul>${list.length > shown.length ? `<p class="muted">ほか ${list.length - shown.length}件(古いもの)</p>` : ''}`
-      : `<p class="muted">「${escapeHtml(name)}」が入っているメモはまだありません</p>`);
-  } catch (e) {
-    if (editing?.name !== name) return;
-    box.innerHTML = `<h3>メモアプリの記録</h3><p class="muted">${escapeHtml(memoLink.errorText(e))}</p>`;
-  }
+function renderMemoApp(name) {
+  memoLink.renderInto(document.getElementById('student-memoapp'), name, () => editing?.name === name);
 }
 
 // 固定枠とこれからの予定

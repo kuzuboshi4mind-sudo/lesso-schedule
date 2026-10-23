@@ -2,6 +2,7 @@
 import * as store from './store.js';
 import { escapeHtml, toMinutes, fromMinutes, textColorFor, START_HOUR } from './calendar.js';
 import { openLineShare } from './line-share.js';
+import * as memoLink from './memo-link.js';
 
 const DAY_END = 24 * 60; // 24:00
 
@@ -35,6 +36,7 @@ const f = {
   memoLabel: document.getElementById('lesson-memo-label'),
   memoHint: document.getElementById('lesson-memo-hint'),
   line: document.getElementById('lesson-line'),
+  memoApp: document.getElementById('lesson-memoapp'),
   error: document.getElementById('lesson-error'),
   recurringInfo: document.getElementById('lesson-recurring-info'),
   repeatField: document.getElementById('repeat-field'),
@@ -149,8 +151,9 @@ async function loadStudentNames() {
 // (メモの欄が生徒メモになっているときは、同じ内容なので出さない)
 function renderStudentMemo() {
   refreshMemoField();
-  // レッスンの予定なら「LINE で予定を送る」を出す
+  // レッスンの予定なら「LINE で予定を送る」と「メモアプリの記録」を出す
   f.line.hidden = memoMode !== 'student';
+  renderMemoApp();
   const memo = memoMode === 'lesson' && studentMemos.find(s => s.name === f.student.value.trim())?.memo;
   f.studentMemo.hidden = !memo;
   f.studentMemo.textContent = memo ? `📝 ${memo}` : '';
@@ -184,6 +187,17 @@ function refreshMemoField() {
   if (!memoDirty || changed) { f.memo.value = memoFor(mode); memoDirty = false; }
 }
 f.memo.addEventListener('input', () => { memoDirty = true; });
+// メモアプリの記録:名前を打っている途中は待って、名前が変わったときだけ読み直す
+let memoAppName = null;
+let memoAppTimer = null;
+function renderMemoApp() {
+  const name = memoMode === 'student' ? f.student.value.trim() : '';
+  if (name === memoAppName) return;
+  memoAppName = name;
+  clearTimeout(memoAppTimer);
+  if (!name) { memoLink.renderInto(f.memoApp, ''); return; }
+  memoAppTimer = setTimeout(() => memoLink.renderInto(f.memoApp, name, () => memoAppName === name && dialog.open), 350);
+}
 // この予定の生徒に、今月・来月の予定を LINE で送る(この予定は、確約でもはじめからチェック)
 f.line.addEventListener('click', () => {
   const name = f.student.value.trim();
@@ -250,6 +264,7 @@ async function openLesson(lesson) {
   if (!form.querySelector('input[name="typeId"]:checked')) form.querySelector('input[name="typeId"]').checked = true;
   memoMode = null;
   memoDirty = false;
+  memoAppName = null;
   renderStudentMemo();
   f.error.textContent = '';
   f.del.hidden = !lesson.id;
