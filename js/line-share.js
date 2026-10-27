@@ -38,7 +38,7 @@ export function initLineShare(opts = {}) {
   // 返事が来たら:チェックした仮の予定を確約にする(1回の「戻す」で全部元に戻せる)
   confirmBtn.addEventListener('click', confirmChecked);
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
-  range.addEventListener('change', build);
+  range.addEventListener('change', () => build());
   pick.addEventListener('change', e => {
     const box = e.target.closest('input[type=checkbox]');
     if (!box) return;
