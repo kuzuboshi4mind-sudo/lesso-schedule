@@ -12,6 +12,7 @@ import { initStudents } from './students.js';
 import { initLineShare } from './line-share.js';
 import { initSummary, updateSummary } from './summary.js';
 import { initInlineEdit, editLessonInline, editCellInline } from './inline-edit.js';
+import { initDayMemos, openDayMemos } from './day-memos.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -20,7 +21,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'LINE の文面に場所を入れない・送る画面で確定(2026-10-27)';
+const APP_VERSION = '1日表示に今日の生徒メモ(2026-10-27)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -34,6 +35,7 @@ let viewMode = phoneQuery.matches ? 'day' : 'month';
 let selectedDate = readDayFromUrl() || defaultDay();
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const viewToggle = document.getElementById('view-toggle');
+const dayMemosBtn = document.getElementById('day-memos');
 const thisMonthBtn = document.getElementById('this-month');
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -74,6 +76,7 @@ async function show({ keepScroll = false } = {}) {
   document.body.classList.toggle('day-view', dayView);
   viewToggle.hidden = !phoneQuery.matches && !dayView;
   viewToggle.textContent = dayView ? '月表示' : '1日表示';
+  dayMemosBtn.hidden = !dayView;
   thisMonthBtn.textContent = dayView ? '今日' : '今月';
 
   const [lessons, notes, types, rules, tentative] = await Promise.all([
@@ -231,6 +234,8 @@ document.getElementById('open-settings').addEventListener('click', showLastBacku
 initRecurring({ onChanged: () => show({ keepScroll: true }) });
 initSummary();
 initLineShare({ onChanged: () => show({ keepScroll: true }) });
+initDayMemos();
+dayMemosBtn.addEventListener('click', () => openDayMemos(selectedDate, shownLessons));
 initStudents({ onChanged: () => show({ keepScroll: true }) });
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)

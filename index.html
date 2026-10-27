@@ -51,6 +51,8 @@
       <button type="button" id="this-month" class="btn btn-primary">今月</button>
       <button type="button" id="next-month" class="btn" aria-label="次の月"><span class="btn-label">次月 </span>▶</button>
       <button type="button" id="view-toggle" class="btn view-toggle" hidden>月表示</button>
+      <!-- 1日表示のときだけ:その日の生徒全員のメモ -->
+      <button type="button" id="day-memos" class="btn" aria-label="この日の生徒メモ" hidden>📝<span class="btn-label"> メモ</span></button>
       <button type="button" id="zoom-fit" class="btn zoom-btn" aria-pressed="false" title="2本指でつまむ・広げるでも拡大・縮小できます">1か月表示</button>
       <button type="button" id="open-students" class="btn" aria-label="生徒メモ">👤<span class="btn-label"> 生徒</span><span id="students-badge" class="count-badge" hidden></span></button>
       <button type="button" id="open-settings" class="btn" aria-label="設定">⚙<span class="btn-label"> 設定</span></button>
@@ -306,6 +308,15 @@
   </dialog>
 
   <!-- 集計 -->
+  <!-- 1日表示の「📝 メモ」:その日のレッスンの生徒全員のメモ(生徒メモ+メモアプリの直近3回) -->
+  <dialog id="day-memos-dialog" class="sheet">
+    <div class="sheet-head">
+      <h2 id="day-memos-title" tabindex="-1">生徒メモ</h2>
+      <button type="button" class="btn btn-primary" data-close>閉じる</button>
+    </div>
+    <div id="day-memos-body"></div>
+  </dialog>
+
   <dialog id="summary-dialog" class="sheet">
     <div class="sheet-head">
       <h2 id="summary-title" tabindex="-1">集計</h2>

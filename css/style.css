@@ -1347,3 +1347,13 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 .memoapp-list li.is-done .memoapp-text { color: var(--muted); }
 #memo-link-form[hidden] { display: none; }
 #line-confirm { margin-top: 10px; width: 100%; }
+
+/* 1日表示の「📝 メモ」(js/day-memos.js) */
+#day-memos[hidden] { display: none; }
+.day-memo-card { margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.day-memo-card h3 { margin: 0 0 6px; font-size: 1.1rem; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.day-memo-card h3 small { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+.day-memo-time { font-size: 0.9rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+.day-memo-label { margin: 8px 0 2px; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.day-memo-text { margin: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.day-memo-app .memoapp-list { max-height: none; }
