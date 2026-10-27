@@ -201,7 +201,8 @@ function renderMemoApp() {
 // この予定の生徒に、今月・来月の予定を LINE で送る(この予定は、確約でもはじめからチェック)
 f.line.addEventListener('click', () => {
   const name = f.student.value.trim();
-  if (name) openLineShare(name, { lessonId: editing?.id });
+  // 送る画面で確定にしたときは、この入力画面の中身が古くなるので閉じる(保存で仮に戻さないように)
+  if (name) openLineShare(name, { lessonId: editing?.id, onSent: () => {}, onConfirmed: () => dialog.close() });
 });
 form.addEventListener('change', e => {
   if (e.target.name === 'typeId' || e.target.name === 'status') renderStudentMemo();

@@ -14,6 +14,7 @@ const dialog = document.getElementById('line-dialog');
 const title = document.getElementById('line-title');
 const range = document.getElementById('line-range');
 const pick = document.getElementById('line-pick');
+const confirmBtn = document.getElementById('line-confirm');
 const text = document.getElementById('line-text');
 const count = document.getElementById('line-count');
 const openLink = document.getElementById('line-open');
@@ -29,8 +30,13 @@ let checked = new Set();   // チェックした予定の id
 let seen = new Set();      // 一度一覧に出した予定の id(はじめのチェックを付けたかどうか)
 let focusId = null;        // 予定の入力画面から開いたときの、その予定(はじめからチェック)
 let onSent = () => {};
+let onConfirmed = () => {};
+let onChanged = () => {};   // 表を描き直す(main.js から)
 
-export function initLineShare() {
+export function initLineShare(opts = {}) {
+  onChanged = opts.onChanged || (() => {});
+  // 返事が来たら:チェックした仮の予定を確約にする(1回の「戻す」で全部元に戻せる)
+  confirmBtn.addEventListener('click', confirmChecked);
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
   range.addEventListener('change', build);
   pick.addEventListener('change', e => {
@@ -98,6 +104,7 @@ function rangeOptions() {
 export async function openLineShare(name, opts = {}) {
   student = name;
   onSent = opts.onSent || (() => {});
+  onConfirmed = opts.onConfirmed || onSent;
   focusId = opts.lessonId || null;
   checked = new Set();
   seen = new Set();
@@ -128,16 +135,32 @@ async function lessonsIn(option) {
 }
 
 // 期間を変えたとき:予定の一覧を作り直す(はじめて出す予定は、仮と、入力画面から開いた予定にチェック)
-async function build() {
+async function build(keepKeys = null) {
   const option = rangeOptions().find(o => o.value === range.value);
   shown = await lessonsIn(option);
   for (const l of shown) {
+    // 確定にしたあとは、チェックしていた予定(固定枠の予定は id が変わるので日付と時刻で見分ける)をチェックのままにする
+    if (keepKeys?.has(`${l.date} ${l.start}`)) { seen.add(l.id); checked.add(l.id); continue; }
     if (seen.has(l.id)) continue;
     seen.add(l.id);
     if ((l.status || 'tentative') === 'tentative' || l.id === focusId) checked.add(l.id);
   }
   renderPick();
   writeText();
+}
+
+async function confirmChecked() {
+  const targets = shown.filter(l => checked.has(l.id) && (l.status || 'tentative') === 'tentative');
+  if (!targets.length) { alert('確定にする仮の予定にチェックをつけてください'); return; }
+  const keep = new Set(shown.filter(l => checked.has(l.id)).map(l => `${l.date} ${l.start}`));
+  const n = await store.confirmLessons(targets);
+  const text0 = text.value;
+  await build(keep);
+  text.value = text0;   // 直した文面はそのまま
+  updateLink();
+  count.textContent = `${n}件の予定を確定にしました(「戻す」で元に戻せます)。`;
+  onChanged();
+  await onConfirmed();
 }
 
 function renderPick() {
@@ -147,6 +170,7 @@ function renderPick() {
       ${dateLabel(l.date)} ${l.start}〜 ${l.duration}分 ${escapeHtml(typeName[l.typeId] || '')}${l.recurring ? ' ↻' : ''}
       <span class="sent-mark">${(l.status || 'tentative') === 'confirmed' ? '確約' : '仮'}</span>
     </label></li>`).join('') : '<li class="muted">この期間の予定はありません</li>';
+  confirmBtn.hidden = !shown.some(l => (l.status || 'tentative') === 'tentative');
 }
 
 // チェックした予定から文面を作る
@@ -158,8 +182,8 @@ function writeText() {
   // 仮・確約の印は付けない(相手に「確定」と出ると不自然なため。2026-10-22)
   const lines = lessons.map(l => {
     const end = fromMinutes(toMinutes(l.start) + l.duration);
-    const place = typeName[l.typeId] ? ` ${typeName[l.typeId]}` : '';
-    return `・${dateLabel(l.date)} ${l.start}〜${end}${place}`;
+    // 場所(自宅・訪問・OKI など)は文面に入れない(2026-10-27)
+    return `・${dateLabel(l.date)} ${l.start}〜${end}`;
   });
   text.value = (template.value || store.DEFAULT_LINE_TEMPLATE)
     .replaceAll('{名前}', student)

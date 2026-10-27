@@ -1346,3 +1346,4 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 .memoapp-text { white-space: pre-wrap; word-break: break-word; }
 .memoapp-list li.is-done .memoapp-text { color: var(--muted); }
 #memo-link-form[hidden] { display: none; }
+#line-confirm { margin-top: 10px; width: 100%; }

@@ -20,7 +20,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '予定の画面にもメモアプリの記録(2026-10-23)';
+const APP_VERSION = 'LINE の文面に場所を入れない・送る画面で確定(2026-10-27)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -230,7 +230,7 @@ initTrashBackup({ getMonth: () => current, onChanged: () => show({ keepScroll: t
 document.getElementById('open-settings').addEventListener('click', showLastBackup);
 initRecurring({ onChanged: () => show({ keepScroll: true }) });
 initSummary();
-initLineShare();
+initLineShare({ onChanged: () => show({ keepScroll: true }) });
 initStudents({ onChanged: () => show({ keepScroll: true }) });
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)
