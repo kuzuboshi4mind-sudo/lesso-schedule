@@ -1,7 +1,7 @@
 // メモアプリ(レッスンメモ https://kuzuboshi4mind-sudo.github.io/lesson-memo/)とつなぐ
 // ・メモアプリは Firebase(Firestore)に、1行ずつ users/{uid}/items/{id} = { m:'YYYY-MM', text, done, t, pos, f } で保存している
 // ・ここでは、メモアプリと同じメールとパスワードでログインして、その行を「読むだけ」(書き換え・削除はしない)
-// ・生徒の画面で、その生徒の名前が入っている行を「メモアプリの記録」として新しい順に出す
+// ・生徒の画面で、先頭の名前(最初のスペースまで)がその生徒の名前と完全に同じ行を「メモアプリの記録」として新しい順に出す
 // ・ログインは端末ごと(Firebase がこの端末に覚える)。パスワードはこのアプリでは保存しない
 // ・下の設定値はメモアプリの firebase-config.js と同じ。画面側に置く前提の公開の値で、
 //   データはメモアプリの firestore.rules(本人だけ読み書きできる)で守られている
@@ -72,12 +72,17 @@ async function allItems() {
   return items;
 }
 
-// その生徒の名前が入っている行(新しい順)。つないでいなければ null
+// 行の先頭の名前(最初のスペースまで。半角・全角どちらのスペースでも)
+// 例:「平田 発表会の曲」→「平田」。「平田さん 発表会」→「平田さん」(平田とは別の人)
+const headName = text => text.trim().split(/[\s　]/)[0];
+
+// 先頭の名前がその生徒の名前と完全に同じ行(新しい順)。つないでいなければ null
 export async function memosFor(name) {
   if (!name || !wasConnected()) return null;
   const list = await allItems();
   if (!list) return null;
-  return list.filter(it => it.text.includes(name)).sort((a, b) => (b.t || 0) - (a.t || 0));
+  const want = name.trim();
+  return list.filter(it => headName(it.text) === want).sort((a, b) => (b.t || 0) - (a.t || 0));
 }
 
 // エラーを日本語に
@@ -109,7 +114,7 @@ export async function renderInto(box, name, stillCurrent = () => true) {
         const date = it.t ? `${d.getFullYear() !== thisYear ? `${d.getFullYear()}/` : ''}${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})` : '';
         return `<li class="${it.done ? 'is-done' : ''}"><span class="memoapp-date">${date}</span><span class="memoapp-text">${it.done ? '✓ ' : ''}${esc(it.text)}</span></li>`;
       }).join('')}</ul>${list.length > shown.length ? `<p class="muted">ほか ${list.length - shown.length}件(古いもの)</p>` : ''}`
-      : `<p class="muted">「${esc(name)}」が入っているメモはまだありません</p>`);
+      : `<p class="muted">「${esc(name)}」で始まるメモはまだありません</p>`);
   } catch (e) {
     if (!stillCurrent()) return;
     box.innerHTML = `<h3>メモアプリの記録</h3><p class="muted">${esc(errorText(e))}</p>`;
