@@ -1357,3 +1357,4 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
 .day-memo-label { margin: 8px 0 2px; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
 .day-memo-text { margin: 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
 .day-memo-app .memoapp-list { max-height: none; }
+.day-memo-card.is-private { background: color-mix(in srgb, var(--muted) 6%, transparent); border-style: dashed; }
