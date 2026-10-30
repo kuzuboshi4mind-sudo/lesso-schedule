@@ -23,10 +23,12 @@ const copyBtn = document.getElementById('line-copy');
 const template = document.getElementById('line-template');
 const to = document.getElementById('line-to');
 const membersBox = document.getElementById('line-members');
-const addSelect = document.getElementById('line-add');
+const addInput = document.getElementById('line-add');
+const addSuggest = document.getElementById('line-add-suggest');
 
 let members = [];          // まとめて送る人(先頭が開いた生徒)
 let extras = {};
+let allNames = [];         // 生徒の一覧の名前(まとめて送る人の検索に使う)
 let types = [];
 let current = [];          // いまの文面に入っている予定
 let shown = [];            // 期間の中の予定(チェックの一覧に出しているもの)
@@ -43,12 +45,19 @@ export function initLineShare(opts = {}) {
   confirmBtn.addEventListener('click', confirmChecked);
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
   range.addEventListener('change', () => build());
-  // まとめて送る人を足す・外す(顔ぶれはどの端末でも覚えておく)
-  addSelect.addEventListener('change', async () => {
-    const name = addSelect.value;
-    addSelect.value = '';
-    if (!name || members.includes(name)) return;
-    await changeMembers([...members, name]);
+  // まとめて送る人を名前で検索して足す・✕で外す(顔ぶれはどの端末でも覚えておく)
+  addInput.addEventListener('input', renderAddSuggest);
+  addInput.addEventListener('keydown', e => {
+    if (e.isComposing || e.keyCode === 229 || e.key !== 'Enter') return;
+    e.preventDefault();
+    const first = addSuggest.querySelector('.suggest-item');
+    if (first) addMember(first.textContent);
+  });
+  // 候補を押した瞬間に入力欄から離れないよう pointerdown で止める
+  addSuggest.addEventListener('pointerdown', e => e.preventDefault());
+  addSuggest.addEventListener('click', e => {
+    const item = e.target.closest('.suggest-item');
+    if (item) addMember(item.textContent);
   });
   membersBox.addEventListener('click', async e => {
     const btn = e.target.closest('button[data-name]');
@@ -129,7 +138,8 @@ export async function openLineShare(name, opts = {}) {
   types = t;
   extras = x;
   members = [name, ...(extras[name]?.lineWith || []).filter(n => n !== name)];
-  renderMembers(overview.map(e => e.name));
+  allNames = overview.map(e => e.name);
+  renderMembers();
   const options = rangeOptions();
   range.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
   template.value = await store.getLineTemplate();
@@ -143,7 +153,7 @@ export async function openLineShare(name, opts = {}) {
 }
 
 // 題名・送り先・まとめて送る人の欄
-function renderMembers(allNames) {
+function renderMembers() {
   title.textContent = `${members.join('さん・')}さんに LINE で送る`;
   // 送り先:開いた生徒の LINE での名前(なければ、まとめて送る人のだれかの)
   const lineName = members.map(n => extras[n]?.lineName).find(Boolean);
@@ -154,16 +164,31 @@ function renderMembers(allNames) {
   membersBox.innerHTML = members.map((n, i) => i === 0
     ? `<span class="line-member is-main">${escapeHtml(n)}さん</span>`
     : `<button type="button" class="line-member" data-name="${escapeHtml(n)}" aria-label="${escapeHtml(n)}さんを外す">${escapeHtml(n)}さん <span class="x">✕</span></button>`).join('');
-  const rest = allNames.filter(n => !members.includes(n));
-  addSelect.innerHTML = `<option value="">＋ 一緒に送る人を追加(家族など)…</option>`
-    + rest.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  addInput.value = '';
+  renderAddSuggest();
+}
+
+// 入れた文字を含む名前を候補に出す(まだ入っていない人だけ。最大8人)
+function renderAddSuggest() {
+  const q = addInput.value.trim();
+  const hits = q ? allNames.filter(n => !members.includes(n) && n.includes(q)).slice(0, 8) : [];
+  addSuggest.innerHTML = hits.length
+    ? hits.map(n => `<button type="button" class="suggest-item">${escapeHtml(n)}</button>`).join('')
+    : q ? '<span class="muted">見つかりません</span>' : '';
+  addSuggest.hidden = !q;
+}
+
+async function addMember(name) {
+  if (!name || members.includes(name)) return;
+  await changeMembers([...members, name]);
+  addInput.focus();
 }
 
 async function changeMembers(next) {
   await store.saveLineGroup(members, next);
   members = next;
   extras = await store.getStudentExtras();
-  renderMembers((await store.getStudentOverview()).map(e => e.name));
+  renderMembers();
   await build();
 }
 

@@ -389,7 +389,8 @@
     <div class="field">
       <span class="field-label">まとめて送る人(家族など。全員分の予定を1回の LINE で送れます)</span>
       <div id="line-members" class="line-members"></div>
-      <select id="line-add" aria-label="一緒に送る人を追加"></select>
+      <input type="search" id="line-add" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="＋ 一緒に送る人を名前で検索(家族など)" aria-label="一緒に送る人を名前で検索">
+      <div id="line-add-suggest" class="suggest" hidden></div>
     </div>
     <label class="field">
       <span class="field-label">期間</span>
