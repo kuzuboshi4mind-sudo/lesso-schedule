@@ -839,6 +839,23 @@ export async function markLineSent(name, lessons) {
   await commit({ label: `${name}さんに LINE で送った印`, settings: [change] });
 }
 
+// LINE でまとめて送る人(家族など)。{ 名前: { lineWith:['一緒に送る人', ...] } } で記録する
+// どの人から開いても同じ顔ぶれになるよう、まとまりの全員に記録する。外した人・前のまとまりの人からは消す
+export async function saveLineGroup(oldGroup, newGroup) {
+  const before = await getStudentExtras();
+  const after = { ...before };
+  const touched = new Set([...oldGroup, ...newGroup]);
+  for (const n of newGroup) for (const m of before[n]?.lineWith || []) touched.add(m);
+  for (const n of touched) {
+    const lineWith = newGroup.includes(n)
+      ? newGroup.filter(m => m !== n)
+      : (before[n]?.lineWith || []).filter(m => !newGroup.includes(m) && !oldGroup.includes(m));
+    if (!before[n] && !lineWith.length) continue;
+    after[n] = { ...(before[n] || {}), lineWith };
+  }
+  await commit({ label: 'LINE でまとめて送る人', settings: [{ key: 'studentExtras', before, after }] });
+}
+
 // 送った印を外す
 export async function clearLineSent(name) {
   const change = await extrasChange(name, { sentAt: null, sent: [] });
@@ -914,6 +931,10 @@ export async function renameStudent(oldName, newName) {
   if (extras[oldName]) {
     const after = { ...extras, [newName]: { ...extras[oldName], ...(extras[newName] || {}) } };
     delete after[oldName];
+    // まとめて送る人(家族)の記録の名前も変える
+    for (const [n, x] of Object.entries(after)) {
+      if (x.lineWith?.includes(oldName)) after[n] = { ...x, lineWith: [...new Set(x.lineWith.map(m => m === oldName ? newName : m))].filter(m => m !== n) };
+    }
     settings.push({ key: 'studentExtras', before: extras, after });
   }
   await commit({

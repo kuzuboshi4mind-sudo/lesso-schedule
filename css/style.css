@@ -1080,6 +1080,12 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
 /* 生徒の画面:仮の予定の一覧と「確定にする」 */
 .student-sent { display: block; padding: 10px 12px; border: 2px dashed var(--tentative); border-radius: 10px; }
 .student-sent .sent-head { margin: 0 0 6px; color: var(--text); }
+.line-members { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.line-member { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; }
+.line-member.is-main { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); }
+.line-member .x { color: var(--muted); font-size: 1.1rem; }
+#line-add { width: 100%; min-height: 44px; }
+.tentative-list .pick-head { margin-top: 6px; font-weight: 700; color: var(--accent); }
 .tentative-list { list-style: none; margin: 0 0 10px; padding: 0; font-variant-numeric: tabular-nums; color: var(--text); }
 .tentative-list label { display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; }
 .tentative-list input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }

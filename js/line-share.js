@@ -5,6 +5,7 @@
 // ・文面はひな形({名前}{期間}{予定})から作る。ひな形は変えて保存できる(どの端末でも同じ)
 // ・生徒メモで「LINE での名前」を登録しておくと、「送り先」として大きく出す(LINE の画面で迷わず選べるように)
 // ・「LINE を開く」を押すと、文面に入れた予定に「送った印」を付ける(生徒の一覧で「返事待ち」になる)
+// ・「まとめて送る人」に家族などを足すと、全員分の予定を1つの文面にして1回で送れる(顔ぶれは覚えておく)
 import * as store from './store.js';
 import { toMinutes, fromMinutes, escapeHtml } from './calendar.js';
 
@@ -21,8 +22,11 @@ const openLink = document.getElementById('line-open');
 const copyBtn = document.getElementById('line-copy');
 const template = document.getElementById('line-template');
 const to = document.getElementById('line-to');
+const membersBox = document.getElementById('line-members');
+const addSelect = document.getElementById('line-add');
 
-let student = '';
+let members = [];          // まとめて送る人(先頭が開いた生徒)
+let extras = {};
 let types = [];
 let current = [];          // いまの文面に入っている予定
 let shown = [];            // 期間の中の予定(チェックの一覧に出しているもの)
@@ -39,6 +43,17 @@ export function initLineShare(opts = {}) {
   confirmBtn.addEventListener('click', confirmChecked);
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
   range.addEventListener('change', () => build());
+  // まとめて送る人を足す・外す(顔ぶれはどの端末でも覚えておく)
+  addSelect.addEventListener('change', async () => {
+    const name = addSelect.value;
+    addSelect.value = '';
+    if (!name || members.includes(name)) return;
+    await changeMembers([...members, name]);
+  });
+  membersBox.addEventListener('click', async e => {
+    const btn = e.target.closest('button[data-name]');
+    if (btn) await changeMembers(members.filter(n => n !== btn.dataset.name));
+  });
   pick.addEventListener('change', e => {
     const box = e.target.closest('input[type=checkbox]');
     if (!box) return;
@@ -54,7 +69,10 @@ export function initLineShare(opts = {}) {
   // LINE を開いたら、送った印を付ける(リンクはそのまま LINE を開く)
   openLink.addEventListener('click', async () => {
     if (openLink.getAttribute('aria-disabled') === 'true' || !current.length) return;
-    await store.markLineSent(student, current);
+    for (const name of members) {
+      const mine = current.filter(l => l.student === name);
+      if (mine.length) await store.markLineSent(name, mine);
+    }
     await onSent();
     count.textContent = `${current.length}件の予定に「送った印」を付けました。`;
   });
@@ -102,20 +120,16 @@ function rangeOptions() {
 
 // その生徒の画面から開く
 export async function openLineShare(name, opts = {}) {
-  student = name;
   onSent = opts.onSent || (() => {});
   onConfirmed = opts.onConfirmed || onSent;
   focusId = opts.lessonId || null;
   checked = new Set();
   seen = new Set();
-  const [t, extras] = await Promise.all([store.getTypes(), store.getStudentExtras()]);
+  const [t, x, overview] = await Promise.all([store.getTypes(), store.getStudentExtras(), store.getStudentOverview()]);
   types = t;
-  title.textContent = `${name}さんに LINE で送る`;
-  const lineName = extras[name]?.lineName;
-  to.classList.toggle('unset', !lineName);
-  to.innerHTML = lineName
-    ? `送り先:<strong>${escapeHtml(lineName)}</strong>(LINE の画面でこの人を選んでください)`
-    : '送り先の LINE での名前が未登録です。生徒の画面の「LINE での名前」に入れておくと、ここに出ます。';
+  extras = x;
+  members = [name, ...(extras[name]?.lineWith || []).filter(n => n !== name)];
+  renderMembers(overview.map(e => e.name));
   const options = rangeOptions();
   range.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
   template.value = await store.getLineTemplate();
@@ -128,10 +142,35 @@ export async function openLineShare(name, opts = {}) {
   title.focus();
 }
 
-// 期間の中の、仮と確約の予定(キャンセル・自分の予定は出さない)
+// 題名・送り先・まとめて送る人の欄
+function renderMembers(allNames) {
+  title.textContent = `${members.join('さん・')}さんに LINE で送る`;
+  // 送り先:開いた生徒の LINE での名前(なければ、まとめて送る人のだれかの)
+  const lineName = members.map(n => extras[n]?.lineName).find(Boolean);
+  to.classList.toggle('unset', !lineName);
+  to.innerHTML = lineName
+    ? `送り先:<strong>${escapeHtml(lineName)}</strong>(LINE の画面でこの人を選んでください)`
+    : '送り先の LINE での名前が未登録です。生徒の画面の「LINE での名前」に入れておくと、ここに出ます。';
+  membersBox.innerHTML = members.map((n, i) => i === 0
+    ? `<span class="line-member is-main">${escapeHtml(n)}さん</span>`
+    : `<button type="button" class="line-member" data-name="${escapeHtml(n)}" aria-label="${escapeHtml(n)}さんを外す">${escapeHtml(n)}さん <span class="x">✕</span></button>`).join('');
+  const rest = allNames.filter(n => !members.includes(n));
+  addSelect.innerHTML = `<option value="">＋ 一緒に送る人を追加(家族など)…</option>`
+    + rest.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+}
+
+async function changeMembers(next) {
+  await store.saveLineGroup(members, next);
+  members = next;
+  extras = await store.getStudentExtras();
+  renderMembers((await store.getStudentOverview()).map(e => e.name));
+  await build();
+}
+
+// 期間の中の、仮と確約の予定(キャンセル・自分の予定は出さない)。まとめて送る人の順、その中は時刻の順
 async function lessonsIn(option) {
-  const lessons = await store.getStudentLessons(student, option.from, option.to);
-  return lessons.filter(l => ['tentative', 'confirmed'].includes(l.status || 'tentative'));
+  const lists = await Promise.all(members.map(n => store.getStudentLessons(n, option.from, option.to)));
+  return lists.flat().filter(l => ['tentative', 'confirmed'].includes(l.status || 'tentative'));
 }
 
 // 期間を変えたとき:予定の一覧を作り直す(はじめて出す予定は、仮と、入力画面から開いた予定にチェック)
@@ -140,7 +179,7 @@ async function build(keepKeys = null) {
   shown = await lessonsIn(option);
   for (const l of shown) {
     // 確定にしたあとは、チェックしていた予定(固定枠の予定は id が変わるので日付と時刻で見分ける)をチェックのままにする
-    if (keepKeys?.has(`${l.date} ${l.start}`)) { seen.add(l.id); checked.add(l.id); continue; }
+    if (keepKeys?.has(`${l.student} ${l.date} ${l.start}`)) { seen.add(l.id); checked.add(l.id); continue; }
     if (seen.has(l.id)) continue;
     seen.add(l.id);
     if ((l.status || 'tentative') === 'tentative' || l.id === focusId) checked.add(l.id);
@@ -152,7 +191,7 @@ async function build(keepKeys = null) {
 async function confirmChecked() {
   const targets = shown.filter(l => checked.has(l.id) && (l.status || 'tentative') === 'tentative');
   if (!targets.length) { alert('確定にする仮の予定にチェックをつけてください'); return; }
-  const keep = new Set(shown.filter(l => checked.has(l.id)).map(l => `${l.date} ${l.start}`));
+  const keep = new Set(shown.filter(l => checked.has(l.id)).map(l => `${l.student} ${l.date} ${l.start}`));
   const n = await store.confirmLessons(targets);
   const text0 = text.value;
   await build(keep);
@@ -165,7 +204,9 @@ async function confirmChecked() {
 
 function renderPick() {
   const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
-  pick.innerHTML = shown.length ? shown.map(l => `<li><label>
+  const many = members.length > 1;
+  pick.innerHTML = shown.length ? shown.map((l, i) => `${many && l.student !== shown[i - 1]?.student
+      ? `<li class="pick-head">${escapeHtml(l.student)}さん</li>` : ''}<li><label>
       <input type="checkbox" value="${escapeHtml(l.id)}" ${checked.has(l.id) ? 'checked' : ''}>
       ${dateLabel(l.date)} ${l.start}〜 ${l.duration}分 ${escapeHtml(typeName[l.typeId] || '')}${l.recurring ? ' ↻' : ''}
       <span class="sent-mark">${(l.status || 'tentative') === 'confirmed' ? '確約' : '仮'}</span>
@@ -178,17 +219,18 @@ function writeText() {
   const option = rangeOptions().find(o => o.value === range.value);
   const lessons = shown.filter(l => checked.has(l.id));
   current = lessons;
-  const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
   // 仮・確約の印は付けない(相手に「確定」と出ると不自然なため。2026-10-22)
-  const lines = lessons.map(l => {
-    const end = fromMinutes(toMinutes(l.start) + l.duration);
-    // 場所(自宅・訪問・OKI など)は文面に入れない(2026-10-27)
-    return `・${dateLabel(l.date)} ${l.start}〜${end}`;
-  });
+  // 場所(自宅・訪問・OKI など)は文面に入れない(2026-10-27)
+  const line = l => `・${dateLabel(l.date)} ${l.start}〜${fromMinutes(toMinutes(l.start) + l.duration)}`;
+  // まとめて送るときは、人ごとに「【名前さん】」の見出しを付ける
+  const blocks = members.length > 1
+    ? members.map(n => lessons.filter(l => l.student === n))
+      .filter(list => list.length).map(list => `【${list[0].student}さん】\n${list.map(line).join('\n')}`)
+    : [lessons.map(line).join('\n')].filter(Boolean);
   text.value = (template.value || store.DEFAULT_LINE_TEMPLATE)
-    .replaceAll('{名前}', student)
+    .replaceAll('{名前}', members.join('・'))
     .replaceAll('{期間}', option.periodText)
-    .replaceAll('{予定}', lines.length ? lines.join('\n') : '(この期間の予定はありません)');
+    .replaceAll('{予定}', blocks.length ? blocks.join('\n\n') : '(この期間の予定はありません)');
   count.textContent = lessons.length
     ? `${lessons.length}件の予定を入れました。`
     : '送る予定にチェックを付けてください。';
