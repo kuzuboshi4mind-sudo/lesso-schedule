@@ -1086,6 +1086,10 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
 .line-member .x { color: var(--muted); font-size: 1.1rem; }
 #line-add { width: 100%; min-height: 44px; }
 #line-add-suggest { margin-top: 6px; }
+.line-suggest-label { width: 100%; font-size: 0.8rem; color: var(--muted); }
+.line-patterns { display: flex; flex-wrap: wrap; gap: 8px; }
+.line-pattern { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.line-pattern[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
 .tentative-list .pick-head { margin-top: 6px; font-weight: 700; color: var(--accent); }
 .tentative-list { list-style: none; margin: 0 0 10px; padding: 0; font-variant-numeric: tabular-nums; color: var(--text); }
 .tentative-list label { display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; }

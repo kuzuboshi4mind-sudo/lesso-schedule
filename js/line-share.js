@@ -22,6 +22,8 @@ const openLink = document.getElementById('line-open');
 const copyBtn = document.getElementById('line-copy');
 const template = document.getElementById('line-template');
 const to = document.getElementById('line-to');
+const patternsBox = document.getElementById('line-patterns');
+const templateName = document.getElementById('line-template-name');
 const membersBox = document.getElementById('line-members');
 const addInput = document.getElementById('line-add');
 const addSuggest = document.getElementById('line-add-suggest');
@@ -29,6 +31,8 @@ const addSuggest = document.getElementById('line-add-suggest');
 let members = [];          // まとめて送る人(先頭が開いた生徒)
 let extras = {};
 let allNames = [];         // 生徒の一覧の名前(まとめて送る人の検索に使う)
+let addCounts = {};        // まとめて送る人に足した回数(よく足す人を先に出す)
+let templates = null;      // ひな形の3パターン { active, list:[{ name, text }] }
 let types = [];
 let current = [];          // いまの文面に入っている予定
 let shown = [];            // 期間の中の予定(チェックの一覧に出しているもの)
@@ -47,6 +51,7 @@ export function initLineShare(opts = {}) {
   range.addEventListener('change', () => build());
   // まとめて送る人を名前で検索して足す・✕で外す(顔ぶれはどの端末でも覚えておく)
   addInput.addEventListener('input', renderAddSuggest);
+  addInput.addEventListener('focus', renderAddSuggest);
   addInput.addEventListener('keydown', e => {
     if (e.isComposing || e.keyCode === 229 || e.key !== 'Enter') return;
     e.preventDefault();
@@ -85,15 +90,21 @@ export function initLineShare(opts = {}) {
     await onSent();
     count.textContent = `${current.length}件の予定に「送った印」を付けました。`;
   });
+  // 文面のパターンを切り替える(どれを選んだかも覚えておく)
+  patternsBox.addEventListener('click', async e => {
+    const btn = e.target.closest('button[data-i]');
+    if (!btn) return;
+    templates = { ...templates, active: Number(btn.dataset.i) };
+    showTemplate();
+    writeText();
+    await store.saveLineTemplates(templates);
+  });
   document.getElementById('line-template-save').addEventListener('click', async () => {
-    await store.saveLineTemplate(template.value);
-    await build();
+    await saveCurrentTemplate(template.value);
     flash(document.getElementById('line-template-save'), '保存しました');
   });
   document.getElementById('line-template-reset').addEventListener('click', async () => {
-    template.value = store.DEFAULT_LINE_TEMPLATE;
-    await store.saveLineTemplate(template.value);
-    await build();
+    await saveCurrentTemplate(store.DEFAULT_LINE_TEMPLATE);
   });
 }
 
@@ -142,7 +153,8 @@ export async function openLineShare(name, opts = {}) {
   renderMembers();
   const options = rangeOptions();
   range.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-  template.value = await store.getLineTemplate();
+  [templates, addCounts] = await Promise.all([store.getLineTemplates(), store.getLineAddCounts()]);
+  showTemplate();
   // はじめに選ぶ期間:来月(入力画面から今月の予定を開いたときは、その予定が見えるよう「今月と来月」)
   const m1 = options.find(o => o.value === 'm1');
   const focus = focusId && (await lessonsIn(options[0])).find(l => l.id === focusId);
@@ -168,20 +180,26 @@ function renderMembers() {
   renderAddSuggest();
 }
 
-// 入れた文字を含む名前を候補に出す(まだ入っていない人だけ。最大8人)
+// 入れた文字を含む名前を候補に出す(まだ入っていない人だけ。最大8人。よく足す人ほど先に)
+// 何も入れていないときは、よく足す人(これまでに足したことのある人)を予測として出す
 function renderAddSuggest() {
   const q = addInput.value.trim();
-  const hits = q ? allNames.filter(n => !members.includes(n) && n.includes(q)).slice(0, 8) : [];
-  addSuggest.innerHTML = hits.length
-    ? hits.map(n => `<button type="button" class="suggest-item">${escapeHtml(n)}</button>`).join('')
-    : q ? '<span class="muted">見つかりません</span>' : '';
-  addSuggest.hidden = !q;
+  const score = n => addCounts[n] || 0;
+  const rest = allNames.filter(n => !members.includes(n));
+  const hits = (q ? rest.filter(n => n.includes(q)) : rest.filter(n => score(n) > 0))
+    .sort((a, b) => score(b) - score(a)).slice(0, q ? 8 : 6);
+  const buttons = hits.map(n => `<button type="button" class="suggest-item">${escapeHtml(n)}</button>`).join('');
+  addSuggest.innerHTML = q
+    ? buttons || '<span class="muted">見つかりません</span>'
+    : buttons && `<span class="line-suggest-label">よく一緒に送る人</span>${buttons}`;
+  addSuggest.hidden = !addSuggest.innerHTML;
 }
 
 async function addMember(name) {
   if (!name || members.includes(name)) return;
+  addCounts = { ...addCounts, [name]: (addCounts[name] || 0) + 1 };
+  store.countLineAdd(name).catch(() => {});   // 数えられなくても足すのは続ける
   await changeMembers([...members, name]);
-  addInput.focus();
 }
 
 async function changeMembers(next) {
@@ -190,6 +208,25 @@ async function changeMembers(next) {
   extras = await store.getStudentExtras();
   renderMembers();
   await build();
+}
+
+// 選んでいるパターンを、ボタンとひな形の欄に出す
+function showTemplate() {
+  const current = templates.list[templates.active] || templates.list[0];
+  patternsBox.innerHTML = templates.list.map((t, i) =>
+    `<button type="button" class="line-pattern" data-i="${i}" aria-pressed="${i === templates.active}">${escapeHtml(t.name || `パターン${i + 1}`)}</button>`).join('');
+  templateName.value = current.name || '';
+  template.value = current.text;
+}
+
+// 選んでいるパターンのひな形を保存して、文面を作り直す
+async function saveCurrentTemplate(text) {
+  const i = templates.active;
+  const list = templates.list.map((t, j) => j === i ? { name: templateName.value.trim() || `パターン${i + 1}`, text } : t);
+  templates = { ...templates, list };
+  await store.saveLineTemplates(templates);
+  showTemplate();
+  writeText();
 }
 
 // 期間の中の、仮と確約の予定(キャンセル・自分の予定は出さない)。まとめて送る人の順、その中は時刻の順

@@ -979,6 +979,33 @@ export async function saveLineTemplate(text) {
   await db.setSetting('lineTemplate', text);
 }
 
+// ひな形は3パターンまで保存できる(2026-10-30)。{ active: 選んでいる番号, list: [{ name, text } ×3] }
+// 前の1つだけのひな形(lineTemplate)があれば、それをパターン1にする
+export const LINE_TEMPLATE_COUNT = 3;
+export async function getLineTemplates() {
+  const saved = await db.getSetting('lineTemplates');
+  if (saved?.list?.length === LINE_TEMPLATE_COUNT) return saved;
+  const first = await getLineTemplate();
+  const list = Array.from({ length: LINE_TEMPLATE_COUNT }, (_, i) => ({
+    name: `パターン${i + 1}`, text: i === 0 ? first : DEFAULT_LINE_TEMPLATE,
+  }));
+  return { active: 0, list };
+}
+
+export async function saveLineTemplates(templates) {
+  await db.setSetting('lineTemplates', templates);
+}
+
+// まとめて送る人に足した回数(よく足す人を、検索の欄の下に先に出すため)。{ 名前: 回数 }
+export async function getLineAddCounts() {
+  return (await db.getSetting('lineAddCounts')) || {};
+}
+
+export async function countLineAdd(name) {
+  const counts = await getLineAddCounts();
+  await db.setSetting('lineAddCounts', { ...counts, [name]: (counts[name] || 0) + 1 });
+}
+
 // 返事が来た仮の予定を、まとめて「確約」にする(1回の「戻す」でまとめて元に戻せる)
 // 固定枠から入った予定は、その日だけ確約の予定にする(固定枠そのものは変えない)
 export async function confirmLessons(lessons) {

@@ -406,6 +406,10 @@
       </div>
       <button type="button" id="line-confirm" class="btn btn-primary">✓ チェックした仮の予定を確定にする</button>
     </div>
+    <div class="field">
+      <span class="field-label">文面のパターン</span>
+      <div id="line-patterns" class="line-patterns"></div>
+    </div>
     <label class="field">
       <span class="field-label">文面(送る前にここで直せます)</span>
       <textarea id="line-text" rows="10"></textarea>
@@ -417,8 +421,12 @@
     </div>
     <p class="sheet-note">「LINE を開く」を押すと LINE の「送信先を選択」の画面が開きます。上の「送り先」の人を選んで送ってください。押すと、この予定に「送った印」が付きます(生徒の一覧で「返事待ち」になります)。</p>
     <details class="line-template">
-      <summary>ひな形(いつもの文面)を変える</summary>
-      <p class="sheet-note">{名前}・{期間}・{予定} のところに、自動で中身が入ります。</p>
+      <summary>選んでいるパターンのひな形(いつもの文面)を変える</summary>
+      <p class="sheet-note">{名前}・{期間}・{予定} のところに、自動で中身が入ります。パターンは3つまで保存できます。</p>
+      <label class="field">
+        <span class="field-label">パターンの名前</span>
+        <input type="text" id="line-template-name" autocomplete="off" placeholder="例:ふつう・家族向け・お休みのお知らせ">
+      </label>
       <textarea id="line-template" rows="6"></textarea>
       <div class="button-row">
         <button type="button" id="line-template-save" class="btn">ひな形を保存</button>
