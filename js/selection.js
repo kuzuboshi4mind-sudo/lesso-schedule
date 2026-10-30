@@ -4,7 +4,8 @@
 // ・選択中にタップ → そのマスだけを選択し直す
 // ・⇧(Shift)を押しながら長押し・タップ・クリック → 離れたマスを追加で選ぶ(複数選択)。
 //   もう一度 ⇧+タップすると、そのマスの選択を外す。キーボードがないときは操作バーの「⇧ 追加選択」を使う
-// ・下に出る操作バーで「文字を入力」「切り取り」「コピー」「貼り付け」「削除」
+// ・下に出る操作バーで「文字を入力」「🎨 色」「切り取り」「コピー」「貼り付け」「削除」
+//   (「🎨 色」は予定とは別に、選んだマスにただ色を塗る。Numbers のセルの塗りと同じ)
 // ・「戻す」「やり直す」で、直前の操作を取り消す/もう一度行う
 // ・Mac のキー操作(選択中):矢印で移動、Shift+矢印で範囲、⌘A 全部、⌘C コピー、⌘X 切り取り、⌘V 貼り付け、
 //   delete 削除、return 編集(予定が1件なら入力画面、それ以外は文字を入力)、esc 選択をやめる
@@ -18,6 +19,12 @@ const MOVE_TOLERANCE = 10;    // これ以上指が動いたら、長押しで�
 const DAY_END = 24 * 60;
 const SLOTS = timeSlots();
 const CLIP_KEY = 'lesso.clipboard';
+const LAST_COLOR_KEY = 'lesso.lastCellColor';
+// マスに塗る色(背景にしても字が読める、やわらかい色)
+const CELL_COLORS = [
+  ['#fff59d', '黄'], ['#ffcc80', 'オレンジ'], ['#f8bbd0', 'ピンク'], ['#ef9a9a', '赤'], ['#e1bee7', '紫'],
+  ['#c5e1a5', '黄緑'], ['#a5d6a7', '緑'], ['#b2ebf2', '水色'], ['#90caf9', '青'], ['#e0e0e0', '灰色'],
+];
 
 let table, scroller, onChanged;
 let lessons = [];            // 表示中の月の予定
@@ -44,6 +51,10 @@ const textDialog = document.getElementById('text-dialog');
 const textForm = document.getElementById('text-form');
 const textInput = document.getElementById('text-input');
 const textTarget = document.getElementById('text-target');
+const colorDialog = document.getElementById('color-dialog');
+const colorTarget = document.getElementById('color-target');
+const cellPalette = document.getElementById('cell-palette');
+const customColor = document.getElementById('cell-color-custom');
 
 // ---------------------------------------------------------
 // 準備(main.js から呼ぶ)
@@ -66,6 +77,15 @@ export function initSelection(opts) {
   });
 
   document.getElementById('sel-text').addEventListener('click', openTextInput);
+  document.getElementById('sel-color').addEventListener('click', openColorPicker);
+  cellPalette.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-color]');
+    if (btn) paintCells(btn.dataset.color);
+  });
+  customColor.addEventListener('change', () => paintCells(customColor.value));
+  document.getElementById('cell-color-clear').addEventListener('click', () => paintCells(null));
+  colorDialog.querySelector('[data-close]').addEventListener('click', () => colorDialog.close());
+  colorDialog.addEventListener('click', e => { if (e.target === colorDialog) colorDialog.close(); });
   document.getElementById('sel-cut').addEventListener('click', () => copySelection({ cut: true }));
   document.getElementById('sel-copy').addEventListener('click', () => copySelection());
   pasteBtn.addEventListener('click', pasteSelection);
@@ -395,6 +415,35 @@ async function saveText() {
       student: text, typeId: last.typeId, status: last.status, memo: '',
     }))), `文字を入力「${text}」`);
   }
+  onChanged();
+}
+
+// 選んでいるマスの '日付|時刻' の一覧
+function selectedCellKeys() {
+  const keys = new Set();
+  for (const r of ranges()) for (const date of r.dates) for (let i = r.i1; i <= r.i2; i++) keys.add(`${date}|${SLOTS[i]}`);
+  return [...keys];
+}
+
+function openColorPicker() {
+  const keys = selectedCellKeys();
+  if (!keys.length) return;
+  let last = '';
+  try { last = localStorage.getItem(LAST_COLOR_KEY) || ''; } catch { /* なくてもよい */ }
+  colorTarget.textContent = `選んだ${keys.length}マスに色を塗ります(予定はそのまま。「戻す」で元に戻せます)`;
+  cellPalette.innerHTML = CELL_COLORS.map(([c, name]) =>
+    `<button type="button" class="cell-swatch${c === last ? ' last' : ''}" data-color="${c}" style="background:${c}" aria-label="${name}">${name}</button>`).join('');
+  if (last) customColor.value = last;
+  colorDialog.showModal();
+}
+
+async function paintCells(color) {
+  const keys = selectedCellKeys();
+  colorDialog.close();
+  if (!keys.length) return;
+  if (color) { try { localStorage.setItem(LAST_COLOR_KEY, color); } catch { /* 覚えられなくても塗る */ } }
+  await store.setCellColors(keys, color);
+  showToast(color ? `${keys.length}マスに色を塗りました` : `${keys.length}マスの色を消しました`);
   onChanged();
 }
 

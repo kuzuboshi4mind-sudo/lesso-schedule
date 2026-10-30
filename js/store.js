@@ -572,9 +572,10 @@ const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
 // 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
 export async function buildBackup(year, month) {
   const [from, to] = year ? monthRange(year, month) : [ALL_FROM, ALL_TO];
-  const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents, tentativeMonths, studentExtras] = await Promise.all([
+  const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents, tentativeMonths, studentExtras, allColors] = await Promise.all([
     db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
     db.listSlots(), db.listExceptions(ALL_FROM, ALL_TO), db.listStudents(), getHiddenStudents(), db.listMonths(), getStudentExtras(),
+    allCellColors(),
   ]);
   const months = year
     ? [`${year}-${String(month).padStart(2, '0')}`]
@@ -588,6 +589,7 @@ export async function buildBackup(year, month) {
     recurring: { slots, exceptions },   // 毎週の固定枠(どの月の書き出しにも全部入れる)
     students,                           // 生徒メモ(どの月の書き出しにも全部入れる)
     tentativeMonths: months.filter(ym => tentativeMonths[ym]),   // 仮の月
+    cellColors: Object.fromEntries(Object.entries(allColors).filter(([k]) => months.includes(k.slice(0, 7)))),   // マスの色
   };
 }
 
@@ -682,8 +684,17 @@ export async function restoreBackup(data, { withSettings = false } = {}) {
       if (before !== after) monthChanges.push({ ym, before, after });
     }
   }
+  // マスの色も、ファイルに入っている月の分をファイルの内容にそろえる(入っていない古いファイルなら今のまま)
+  const settingChanges = [];
+  if (data.cellColors && typeof data.cellColors === 'object') {
+    const before = await allCellColors();
+    const after = Object.fromEntries(Object.entries(before).filter(([k]) => !data.months.includes(k.slice(0, 7))));
+    Object.assign(after, data.cellColors);
+    settingChanges.push({ key: 'cellColors', before, after });
+  }
   await commit({
     months: monthChanges,
+    settings: settingChanges,
     label: `バックアップの読み込み(${data.months.join('・')})`,
     lessons: lessonChanges, notes: noteChanges, slots: slotChanges, exceptions: excChanges, students: studentChanges,
   });
@@ -702,6 +713,28 @@ export async function getStudentNames() {
   const names = new Set([...fromLessons, ...slots.map(sl => sl.student)].filter(Boolean));
   for (const n of hidden) names.delete(n);
   return [...names].sort((a, b) => a.localeCompare(b, 'ja'));
+}
+
+// ---- マスの色(予定とは別に、マスにただ色を塗る。Numbers のセルの塗りと同じ。2026-10-30)----
+// { '2026-11-05|13:00': '#fff59d', ... }(設定の cellColors。30分のマスごと)
+async function allCellColors() {
+  return (await db.getSetting('cellColors')) || {};
+}
+
+// その月のマスの色
+export async function getCellColors(year, month) {
+  const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+  return Object.fromEntries(Object.entries(await allCellColors()).filter(([k]) => k.startsWith(prefix)));
+}
+
+// マスに色を塗る(color が空なら色を消す)。keys は '日付|時刻' の一覧。「戻す」で元に戻せる
+export async function setCellColors(keys, color) {
+  const before = await allCellColors();
+  const after = { ...before };
+  for (const k of keys) {
+    if (color) after[k] = color; else delete after[k];
+  }
+  await commit({ label: color ? `マスの色(${keys.length}マス)` : `マスの色を消す(${keys.length}マス)`, settings: [{ key: 'cellColors', before, after }] });
 }
 
 // ---- 日ごとのメモ(「予定」の行)----

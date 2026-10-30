@@ -81,6 +81,7 @@
     <div class="selection-actions">
       <button type="button" id="sel-multi" class="btn toggle-btn" aria-pressed="false" title="オンの間はタップでマスを追加で選べます(⇧を押しながらと同じ)">⇧ 追加選択</button>
       <button type="button" id="sel-text" class="btn">文字を入力</button>
+      <button type="button" id="sel-color" class="btn">🎨 色</button>
       <button type="button" id="sel-cut" class="btn">切り取り</button>
       <button type="button" id="sel-copy" class="btn">コピー</button>
       <button type="button" id="sel-paste" class="btn">貼り付け</button>
@@ -377,6 +378,20 @@
         <button type="button" id="student-delete" class="btn btn-danger">この生徒を削除</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- 選んだマスに色を塗る(予定とは別に、マスにただ色を付ける) -->
+  <dialog id="color-dialog" class="sheet sheet-small">
+    <div class="sheet-head">
+      <h2 tabindex="-1">マスに色を塗る</h2>
+      <button type="button" class="btn" data-close>閉じる</button>
+    </div>
+    <p id="color-target" class="sheet-note"></p>
+    <div id="cell-palette" class="cell-palette"></div>
+    <div class="button-row">
+      <label class="btn palette-custom">ほかの色…<input type="color" id="cell-color-custom" value="#fff59d"></label>
+      <button type="button" id="cell-color-clear" class="btn">色を消す</button>
+    </div>
   </dialog>
 
   <!-- LINE で予定を送る(文面を作って LINE を開く。送る相手は LINE の画面で選ぶ) -->

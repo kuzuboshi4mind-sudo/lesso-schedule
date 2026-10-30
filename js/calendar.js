@@ -154,7 +154,7 @@ export const DISPLAY_START_HOUR = 8;
 
 // data.onlyDate を渡すと、その1日だけの表にする(スマホの「1日ビュー」)
 export function renderCalendar(table, year, month, data = {}) {
-  const { dayNotes = {}, types = [], onlyDate = null } = data;
+  const { dayNotes = {}, types = [], onlyDate = null, cellColors = {} } = data;
   const lessons = onlyDate ? (data.lessons || []).filter(l => l.date === onlyDate) : (data.lessons || []);
   const earliest = Math.min(DISPLAY_START_HOUR * 60, ...lessons.map(l => toMinutes(l.start)));
   const firstSlot = `${Math.floor(earliest / 60)}:${earliest % 60 >= 30 ? '30' : '00'}`;
@@ -193,7 +193,10 @@ export function renderCalendar(table, year, month, data = {}) {
   const bodyRows = slots.slice(Math.max(0, slots.indexOf(firstSlot))).map(time => {
     const cells = days.map(d => {
       const blocks = blocksBySlot[`${d.key}|${time}`];
-      return `<td class="${colClass(d)}" data-date="${d.key}" data-time="${time}">${blocks ? `<div class="slot">${blocks.join('')}</div>` : ''}</td>`;
+      // マスの色(予定とは別に塗った色)
+      const paint = cellColors[`${d.key}|${time}`];
+      const painted = paint ? ` painted" style="--cell-color:${escapeHtml(paint)}` : '';
+      return `<td class="${colClass(d)}${painted}" data-date="${d.key}" data-time="${time}">${blocks ? `<div class="slot">${blocks.join('')}</div>` : ''}</td>`;
     }).join('');
     const isHour = time.endsWith(':00');
     return `<tr class="${isHour ? 'hour' : ''}"><th class="time-col" scope="row">${time}</th>${cells}</tr>`;

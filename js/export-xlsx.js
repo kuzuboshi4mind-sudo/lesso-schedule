@@ -94,8 +94,9 @@ function lessonStyle(l, type) {
 // 1か月分のシートを作る
 // ---------------------------------------------------------
 async function addMonthSheet(workbook, year, month, common) {
-  const [lessons, notes, tentative] = await Promise.all([
+  const [lessons, notes, tentative, cellColors] = await Promise.all([
     store.getLessons(year, month), store.getDayNotes(year, month), store.isTentativeMonth(year, month),
+    store.getCellColors(year, month),
   ]);
   const { types, rules, students } = common;
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
@@ -139,7 +140,12 @@ async function addMonthSheet(workbook, year, month, common) {
     row.getCell(1).value = time;
     row.getCell(1).font = { bold: time.endsWith(':00'), color: { argb: time.endsWith(':00') ? COLORS.text : COLORS.muted } };
     row.getCell(1).fill = fill(COLORS.head);
-    days.forEach((d, j) => { if (d.isOff) row.getCell(j + 2).fill = fill(COLORS.off); });
+    days.forEach((d, j) => {
+      // マスの色(予定とは別に塗った色)があればその色。予定のあるマスは、あとで予定の色になる
+      const paint = cellColors[`${d.key}|${time}`];
+      if (paint) row.getCell(j + 2).fill = fill(argb(paint));
+      else if (d.isOff) row.getCell(j + 2).fill = fill(COLORS.off);
+    });
   });
 
   // ---- 予定 ----

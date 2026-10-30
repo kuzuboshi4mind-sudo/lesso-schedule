@@ -21,7 +21,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'よく送る人の予測・文面3パターン(2026-10-30)';
+const APP_VERSION = 'マスに色を塗る(2026-10-30)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -79,16 +79,16 @@ async function show({ keepScroll = false } = {}) {
   dayMemosBtn.hidden = !dayView;
   thisMonthBtn.textContent = dayView ? '今日' : '今月';
 
-  const [lessons, notes, types, rules, tentative] = await Promise.all([
+  const [lessons, notes, types, rules, tentative, cellColors] = await Promise.all([
     store.getLessons(year, month), store.getDayNotes(year, month), store.getTypes(), store.getDurationRules(),
-    store.isTentativeMonth(year, month),
+    store.isTentativeMonth(year, month), store.getCellColors(year, month),
   ]);
   showMonthStatus(tentative);
   updateStudentsBadge();
   dayNotes = notes;
   shownLessons = lessons;
   const { scrollLeft, scrollTop } = scroller;
-  renderCalendar(table, year, month, { lessons, dayNotes, types, onlyDate: dayView ? selectedDate : null });
+  renderCalendar(table, year, month, { lessons, dayNotes, types, cellColors, onlyDate: dayView ? selectedDate : null });
   refreshZoom();
   renderLegend(types);
   updateSummary(year, month, lessons, types, rules);
