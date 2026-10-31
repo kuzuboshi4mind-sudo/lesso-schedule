@@ -1,7 +1,7 @@
 // Numbers への書き出し(Excel 形式 .xlsx)
 // ・1か月を1枚のシート(Numbers ではタブ)にする。仮の月はシート名が「10月仮」
 // ・表の形は今の Numbers と同じ:縦=30分刻みの時刻、横=日付。上に「曜日」「予定」の行
-// ・予定は種類の色で塗る(確約=濃い色+○、仮=薄い色+点線の枠、キャンセル=灰色+×、なし=左に太い線)
+// ・予定は種類の色で塗る(確約=濃い色(○は付けない。2026-10-31)、仮=薄い色+点線の枠、キャンセル=灰色+×、なし=左に太い線)
 // ・60分以上の予定は、たてにマスをつなげる(重なりがないとき)
 // ・表の下に集計、右に生徒の一覧(名前の色=種類、メモ)
 // ・種類をしぼって書き出せる(OKI川口・OKI加茂だけ など。2026-10-31)。しぼったときは、その種類の予定・集計・生徒だけを出し、
@@ -59,17 +59,15 @@ function tint(hex, ratio = 0.3) {
 const fill = color => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: color } });
 const side = (color, style = 'thin') => ({ style, color: { argb: color } });
 
-// 予定1件の文字(確約は「名前○」、キャンセルは「×名前」)と長さの表示
+// 予定1件の文字(キャンセルは「×名前」)と長さの表示
+// 確約の「○」と「60分」「45分」などの長さは出さない(2026-10-31 本人の希望。長さはつなげたマスの高さでわかる)
 function lessonLabel(l) {
-  const status = l.status || 'tentative';
   const name = l.student || '(名前なし)';
-  if (status === 'confirmed') return `${name}○`;
-  if (status === 'cancelled') return `×${name}`;
-  return name;
+  return (l.status || 'tentative') === 'cancelled' ? `×${name}` : name;
 }
+// 120分より長い予定だけ、終わりの時刻(「〜22:00」)を添える
 function durationLabel(l) {
-  if (l.duration > 120) return `〜${fromMinutes(toMinutes(l.start) + l.duration)}`;
-  return l.duration === 30 ? '' : `${l.duration}分`;
+  return l.duration > 120 ? `〜${fromMinutes(toMinutes(l.start) + l.duration)}` : '';
 }
 
 // 予定を塗るときの見た目
@@ -182,7 +180,7 @@ async function addMonthSheet(workbook, year, month, common) {
         while (last < end && !byRow.has(last + 1) && !used.has(last + 1)) last++;
       }
       const cell = ws.getRow(HEAD_ROWS + 1 + r).getCell(col);
-      // つなげたマス(60分以上)は2行、1マスに収まる予定は1行(「すずき○ 15分」)
+      // つなげたマス(60分以上)は名前(長い予定は終わりの時刻も)、1マスに2件は2行
       cell.value = list.length === 1 && last > r
         ? [lessonLabel(first), durationLabel(first)].filter(Boolean).join('\n')
         : list.map(l => [lessonLabel(l), durationLabel(l)].filter(Boolean).join(' ')).join('\n');
@@ -280,7 +278,7 @@ async function addMonthSheet(workbook, year, month, common) {
   }
   r += 2;
   ws.getRow(r).getCell(2).value = '合計は「確約」だけ。「仮」は参考。キャンセル・なし・集計に入れない種類は数えていません。'
-    + ' 塗りの見方:濃い色+○=確約、薄い色+点線=仮、灰色+×=キャンセル、左に太い線=なし(自分の予定)';
+    + ' 塗りの見方:濃い色=確約、薄い色+点線=仮、灰色+×=キャンセル、左に太い線=なし(自分の予定)';
   ws.getRow(r).getCell(2).font = { size: 9, color: { argb: COLORS.muted } };
 
   // ---- 表の右:生徒の一覧(名前の色=種類、メモ)----
