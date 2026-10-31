@@ -21,7 +21,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'マスに色を塗る(2026-10-30)';
+const APP_VERSION = 'iPad もスマホと同じ見え方に(2026-10-31)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -89,9 +89,10 @@ async function show({ keepScroll = false } = {}) {
   shownLessons = lessons;
   const { scrollLeft, scrollTop } = scroller;
   renderCalendar(table, year, month, { lessons, dayNotes, types, cellColors, onlyDate: dayView ? selectedDate : null });
-  refreshZoom();
   renderLegend(types);
   updateSummary(year, month, lessons, types, rules);
+  // 見本の帯の高さが決まってから大きさを合わせる(1日が縦にちょうど収まるように)
+  refreshZoom();
   afterRender(lessons);
   if (keepScroll) {
     scroller.scrollLeft = scrollLeft;

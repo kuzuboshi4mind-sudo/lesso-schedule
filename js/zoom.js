@@ -3,6 +3,8 @@
 // ・2本指を広げる(ピンチアウト)と拡大
 // ・上の「1か月表示」ボタンで、1画面に収まる大きさと元の大きさを切り替え
 // ・スマホは、文字が読めるように日付の列をせまくしすぎない(縦は1日分が収まり、横はスクロール)
+// ・iPad・Mac もスマホと同じ見え方にする(2026-10-31):開いたときは1日(8:00〜24:00)が縦に収まる高さ、
+//   横に縮めても文字は小さくしすぎず(0.92倍=約11px まで)、日付の列は 34px より細くしない
 // ・Mac:⌘ を押しながらスクロール(またはトラックパッドのピンチ)で拡大・縮小
 // 大きさは端末ごとに覚えておく(次に開いたときも同じ大きさ)
 
@@ -23,6 +25,8 @@ const baseDay = () => cssPx('--day-base', 58);
 const phoneQuery = window.matchMedia('(max-width: 600px), (max-height: 500px)');
 const PHONE_MIN_DAY = 30;     // スマホで日付の列をこれより細くしない(px。名前は折り返さず、はみ出た分は切る)
 const PHONE_MIN_FONT = 0.8;   // スマホで文字をこれより小さくしない(元の大きさに対する倍率)
+const WIDE_MIN_DAY = 34;      // iPad・Mac で日付の列をこれより細くしない(px)
+const WIDE_MIN_FONT = 0.92;   // iPad・Mac で文字をこれより小さくしない(12px × 0.92 ≒ 11px。スマホの文字と同じくらい)
 const MAX = 1.8;            // いちばん大きくしたとき(元の1.8倍)
 const SAVE_KEY = 'lesso.zoom';
 
@@ -38,7 +42,8 @@ export function initZoom(opts) {
     if (saved) ({ zx, zy } = saved);
   } catch { /* 読めなければ元の大きさ */ }
   // スマホは開いた瞬間に1日(8:00〜24:00)が縦に全部見える大きさにする(横は元の幅)
-  if (phoneQuery.matches) { zx = 1; zy = 0; }
+  // iPad・Mac も同じく、縦は1日が収まる高さで開く(横は前回の大きさ)
+  if (phoneQuery.matches) { zx = 1; zy = 0; } else { zy = 0; }
 
   scroller.addEventListener('touchstart', onTouchStart, { passive: true });
   scroller.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -79,17 +84,17 @@ function fitScale() {
     fy = (h - headHeight(zf) - 4) / (rowCount() * baseRow());
   }
   // スマホは1か月を横に全部入れると文字が読めないので、列の幅に下限をつける(残りは横スクロール)
-  if (phoneQuery.matches) fx = Math.max(fx, PHONE_MIN_DAY / baseDay());
+  // iPad・Mac も、文字が読めるよう列の幅に下限をつける(iPad の縦向きは横スクロールになる)
+  fx = Math.max(fx, (phoneQuery.matches ? PHONE_MIN_DAY : WIDE_MIN_DAY) / baseDay());
   // 1日ビューは、1日がちょうど画面の高さいっぱいになるように行を伸ばしてよい
   const dayView = document.body.classList.contains('day-view');
   return { fx: Math.min(fx, 1), fy: Math.min(fy, dayView ? MAX : 1) };
 }
 
-// 文字の大きさは、横と縦の小さいほうに合わせる(小さくなりすぎないよう 0.6 倍まで)
-// スマホは行がもともと低いので、縦に縮めても文字は小さくせず、横の拡大率に合わせる(0.9 倍まで)
+// 文字の大きさは横の拡大率に合わせる。縦に縮めても文字は小さくしない(スマホと同じ。2026-10-31 に iPad・Mac も)
+// 小さくしすぎないよう、スマホは 0.8 倍、iPad・Mac は 0.92 倍まで
 function fontScale(x, y) {
-  if (phoneQuery.matches) return Math.min(1.4, Math.max(PHONE_MIN_FONT, x));
-  return Math.min(1.4, Math.max(0.6, Math.min(x, y)));
+  return Math.min(1.4, Math.max(phoneQuery.matches ? PHONE_MIN_FONT : WIDE_MIN_FONT, x));
 }
 
 function clamp() {
@@ -101,11 +106,20 @@ function clamp() {
 
 function apply() {
   if (!table) return;
-  const { fx, fy } = clamp();
+  const fitY = zy === 0;   // 「1日が縦にちょうど収まる高さ」にするとき
+  let { fx, fy } = clamp();
   const root = document.documentElement.style;
   root.setProperty('--zx', zx);
   root.setProperty('--zy', zy);
   root.setProperty('--zf', fontScale(zx, zy));
+  // 文字の大きさが変わると見出しの高さも変わるので、実際の見出しの高さでもう一度合わせる(最後の行が切れないように)
+  if (fitY) {
+    for (let i = 0; i < 2; i++) {
+      ({ fx, fy } = fitScale());
+      zy = fy;
+      root.setProperty('--zy', zy);
+    }
+  }
   const isFit = Math.abs(zx - fx) < 0.01 && Math.abs(zy - fy) < 0.01;
   btn.setAttribute('aria-pressed', String(isFit));
   btn.textContent = isFit ? '元の大きさ' : '1か月表示';
