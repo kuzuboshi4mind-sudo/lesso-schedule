@@ -260,6 +260,13 @@
     <section class="settings-section">
       <h3>Numbers に書き出す</h3>
       <p class="sheet-note">表を Excel 形式(.xlsx)のファイルにします。Numbers で開くと、今の Numbers と同じ形の表(色つき)と集計・生徒の一覧が出ます。月ごとに1枚のシートになります。</p>
+      <label class="field">
+        <span class="field-label">書き出す予定</span>
+        <select id="xlsx-filter">
+          <option value="all">すべての予定</option>
+          <option value="oki">OKI川口・OKI加茂だけ</option>
+        </select>
+      </label>
       <div class="button-row">
         <button type="button" id="xlsx-month" class="btn">表示中の月</button>
         <button type="button" id="xlsx-year" class="btn">この年の1〜12月</button>

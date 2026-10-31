@@ -4,6 +4,8 @@
 // ・予定は種類の色で塗る(確約=濃い色+○、仮=薄い色+点線の枠、キャンセル=灰色+×、なし=左に太い線)
 // ・60分以上の予定は、たてにマスをつなげる(重なりがないとき)
 // ・表の下に集計、右に生徒の一覧(名前の色=種類、メモ)
+// ・種類をしぼって書き出せる(OKI川口・OKI加茂だけ など。2026-10-31)。しぼったときは、その種類の予定・集計・生徒だけを出し、
+//   「予定」の行のメモとマスの色は出さない(自分の予定が入らないように)
 // Excel 形式のファイルを作る部品(ExcelJS)は、書き出すときだけ読み込む
 import * as store from './store.js';
 import { monthDays, timeSlots, toMinutes, fromMinutes, textColorFor, START_HOUR } from './calendar.js';
@@ -94,11 +96,17 @@ function lessonStyle(l, type) {
 // 1か月分のシートを作る
 // ---------------------------------------------------------
 async function addMonthSheet(workbook, year, month, common) {
-  const [lessons, notes, tentative, cellColors] = await Promise.all([
+  const { types, rules, onlyTypes } = common;
+  const [allLessons, allNotes, tentative, allColors] = await Promise.all([
     store.getLessons(year, month), store.getDayNotes(year, month), store.isTentativeMonth(year, month),
     store.getCellColors(year, month),
   ]);
-  const { types, rules, students } = common;
+  const lessons = onlyTypes ? allLessons.filter(l => onlyTypes.includes(l.typeId)) : allLessons;
+  const notes = onlyTypes ? {} : allNotes;
+  const cellColors = onlyTypes ? {} : allColors;
+  // 種類をしぼったときは、この月にその種類の予定がある生徒だけ
+  const names = new Set(lessons.map(l => l.student));
+  const students = onlyTypes ? common.students.filter(st => names.has(st.name)) : common.students;
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
   const days = monthDays(year, month, new Date(0));
   const ws = workbook.addWorksheet(`${month}月${tentative ? '仮' : ''}`, {
@@ -212,7 +220,7 @@ async function addMonthSheet(workbook, year, month, common) {
   // ---- 表の下:集計 ----
   const s = computeSummary(lessons, types, rules);
   let r = lastRow + 2;
-  ws.getRow(r).getCell(2).value = `${month}月の集計`;
+  ws.getRow(r).getCell(2).value = `${month}月の集計${onlyTypes ? '(OKI川口・OKI加茂だけ)' : ''}`;
   ws.getRow(r).getCell(2).font = { bold: true, size: 12 };
   r++;
   const headers = ['種類', '', '確約 件数', '確約 時間数(h)', 'コマ数(30分)', '仮 件数', '仮 時間数(h)'];
@@ -246,7 +254,8 @@ async function addMonthSheet(workbook, year, month, common) {
   for (const row of s.rows) summaryRow(row.type.name, row.type.color, row, false);
   summaryRow('レッスン合計', null, s.total, true);
   // 練習と、レッスン以外(ライブ・サウナ・釣りなど):種類ごとの件数と時間(合計には入れない)
-  const sections = [
+  // (種類をしぼったときは出さない)
+  const sections = onlyTypes ? [] : [
     ['練習(合計に入れない)', s.practice ? [s.practice] : []],
     ['プライベート(合計に入れない)', s.others],
   ];
@@ -309,15 +318,20 @@ async function addMonthSheet(workbook, year, month, common) {
   return ws;
 }
 
-// 書き出す。months:[{ year, month }]。戻り値は File
-export async function buildXlsx(months, fileName) {
+// OKI川口・OKI加茂の種類(id が初期のものか、名前が「OKI」で始まるもの)
+export function okiTypeIds(types) {
+  return types.filter(t => ['oki-kawaguchi', 'oki-kamo'].includes(t.id) || /^OKI/i.test(t.name)).map(t => t.id);
+}
+
+// 書き出す。months:[{ year, month }]。onlyTypes:種類の id の一覧(しぼるとき)。戻り値は File
+export async function buildXlsx(months, fileName, onlyTypes = null) {
   const ExcelJS = await loadExcelJS();
   const [types, rules, students] = await Promise.all([store.getTypes(), store.getDurationRules(), store.getStudentOverview()]);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'レッスンスケジュール';
   workbook.created = new Date();
   for (const { year, month } of months) {
-    await addMonthSheet(workbook, year, month, { types, rules, students });
+    await addMonthSheet(workbook, year, month, { types, rules, students, onlyTypes });
   }
   const buffer = await workbook.xlsx.writeBuffer();
   return new File([buffer], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

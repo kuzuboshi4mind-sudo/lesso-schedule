@@ -3,7 +3,7 @@
 // ・バックアップ:この月/全部の予定をファイル(.json)に書き出す。書き出したファイルを読み込んで元に戻す
 import * as store from './store.js';
 import { escapeHtml } from './calendar.js';
-import { buildXlsx } from './export-xlsx.js';
+import { buildXlsx, okiTypeIds } from './export-xlsx.js';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -137,17 +137,21 @@ function offerFile(file, title, description, saved = () => {}) {
 async function exportXlsx(thisMonthOnly) {
   const m = getMonth();
   const months = thisMonthOnly ? [m] : Array.from({ length: 12 }, (_, i) => ({ year: m.year, month: i + 1 }));
+  // 「OKI川口・OKI加茂だけ」のときは、その2つの種類の予定だけ(ファイル名の終わりに -OKI)
+  const oki = document.getElementById('xlsx-filter').value === 'oki';
+  const onlyTypes = oki ? okiTypeIds(await store.getTypes()) : null;
+  const suffix = oki ? '-OKI' : '';
   const name = thisMonthOnly
-    ? `lesson-${m.year}-${String(m.month).padStart(2, '0')}.xlsx`
-    : `lesson-${m.year}.xlsx`;
+    ? `lesson-${m.year}-${String(m.month).padStart(2, '0')}${suffix}.xlsx`
+    : `lesson-${m.year}${suffix}.xlsx`;
   const btn = document.getElementById(thisMonthOnly ? 'xlsx-month' : 'xlsx-year');
   const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = '作っています…';
   try {
-    const file = await buildXlsx(months, name);
+    const file = await buildXlsx(months, name, onlyTypes);
     offerFile(file, 'Numbers 用のファイルを保存',
-      `${name}(${thisMonthOnly ? `${m.month}月` : `${m.year}年1〜12月`})。保存したファイルを「ファイル」アプリでタップすると Numbers で開けます。`);
+      `${name}(${thisMonthOnly ? `${m.month}月` : `${m.year}年1〜12月`}${oki ? '・OKI川口・OKI加茂だけ' : ''})。保存したファイルを「ファイル」アプリでタップすると Numbers で開けます。`);
   } catch (err) {
     alert(`書き出せませんでした(${err.message})`);
   } finally {

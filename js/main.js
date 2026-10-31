@@ -21,7 +21,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'iPad もスマホと同じ見え方に(2026-10-31)';
+const APP_VERSION = 'Numbers 書き出しで OKI だけ(2026-10-31)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
