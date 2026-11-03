@@ -789,9 +789,13 @@ export async function getStudents() {
 export async function getStudentOverview() {
   const today = localToday();
   const from = addDays(today, -180), to = addDays(today, 92);
-  // 連絡が必要かどうか・仮の予定の一覧は、今月と来月の分だけで見る(2か月以上先の予定を送ることはまずないため。2026-10-19)
+  // 生徒の画面の仮の予定の一覧は、今月と来月の分(2か月以上先の予定を送ることはまずないため。2026-10-19)
+  // 「連絡が必要」かどうかは、今月の分だけで見る(月が変わると来月の仮の予定でいっぱいになるため。2026-11-03)
   const [ty, tm] = today.split('-').map(Number);
   const nextMonthEnd = `${tm === 12 ? ty + 1 : ty}-${String(tm === 12 ? 1 : tm + 1).padStart(2, '0')}-31`;
+  const thisMonthEnd = `${today.slice(0, 7)}-31`;
+  // キャンセルした予定は「振替が必要」として、「振替済み」を押すまで残す(30日前から来月末までのキャンセル。2026-11-03)
+  const cancelFrom = addDays(today, -30);
   const [students, allLessons, occurrences, allSlots, types, hidden, extras] = await Promise.all([
     db.listStudents(), db.listLessons(from, to), getOccurrences(today, to), db.listSlots(), getTypes(), getHiddenStudents(),
     getStudentExtras(),
@@ -806,7 +810,7 @@ export async function getStudentOverview() {
       const x = extras[name] || {};
       byName.set(name, {
         name, id: null, memo: '', typeId: null, next: null, slots: [], count: 0, lastDate: '',
-        lineName: x.lineName || '', sentAt: x.sentAt || null, tentative: [], unsent: [],
+        lineName: x.lineName || '', sentAt: x.sentAt || null, tentative: [], unsent: [], reschedule: [],
       });
     }
     return byName.get(name);
@@ -827,17 +831,24 @@ export async function getStudentOverview() {
     }
     if (l.date >= today && status !== 'cancelled') e.count++;
     if (l.date >= today && l.date <= nextMonthEnd && status === 'tentative') e.tentative.push(l);
+    if (l.date >= cancelFrom && l.date <= nextMonthEnd && status === 'cancelled') e.reschedule.push(l);
   }
   for (const sl of activeSlots) {
     const e = byName.get(sl.student);
     if (e && !e.typeId) e.typeId = sl.typeId;
   }
-  // まとまり:todo=仮の予定があり、まだ LINE で送っていないものがある / waiting=仮の予定は全部送った(返事待ち)
-  //          confirmed=これからの予定は全部確約 / none=これからの予定なし
+  // まとまり:todo=今月の仮の予定で、まだ LINE で送っていないものがある、または振替が必要なキャンセルがある
+  //          waiting=今月の仮の予定は全部送った(返事待ち) / confirmed=今月の予定は全部確約 / none=これからの予定なし
   for (const e of byName.values()) {
     const sent = new Set((extras[e.name]?.sent || []).map(x => x.id));
+    const done = new Set((extras[e.name]?.rescheduled || []).map(x => x.id));
+    e.reschedule = e.reschedule.filter(l => !done.has(l.id))
+      .sort((a, b) => (a.date + a.start.padStart(5, '0')).localeCompare(b.date + b.start.padStart(5, '0')));
     e.unsent = e.tentative.filter(l => !sent.has(l.id));
-    e.group = e.tentative.length ? (e.unsent.length ? 'todo' : 'waiting') : e.count ? 'confirmed' : 'none';
+    const nowTentative = e.tentative.filter(l => l.date <= thisMonthEnd);
+    e.unsentNow = e.unsent.filter(l => l.date <= thisMonthEnd);
+    e.group = e.unsentNow.length || e.reschedule.length ? 'todo'
+      : nowTentative.length ? 'waiting' : e.count ? 'confirmed' : 'none';
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 }
@@ -887,6 +898,14 @@ export async function saveLineGroup(oldGroup, newGroup) {
     after[n] = { ...(before[n] || {}), lineWith };
   }
   await commit({ label: 'LINE でまとめて送る人', settings: [{ key: 'studentExtras', before, after }] });
+}
+
+// キャンセルした予定を「振替済み」にする(「振替が必要」から外す。「戻す」で元に戻せる)。古い記録は消して軽くする
+export async function markRescheduled(name, lesson) {
+  const old = ((await getStudentExtras())[name]?.rescheduled || []).filter(x => x.date >= addDays(localToday(), -60));
+  if (old.some(x => x.id === lesson.id)) return;
+  const change = await extrasChange(name, { rescheduled: [...old, { id: lesson.id, date: lesson.date }] });
+  await commit({ label: `${name}さんの振替済み(${lesson.date.slice(5).replace('-', '/')})`, settings: [change] });
 }
 
 // 送った印を外す

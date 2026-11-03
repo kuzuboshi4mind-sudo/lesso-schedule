@@ -1063,6 +1063,9 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
   background: var(--tentative);
   color: #fff;
 }
+.student-badge.reschedule { background: var(--danger, #d0473c); color: #fff; margin-left: 4px; }
+.reschedule-box { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+.reschedule-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; }
 .student-badge.waiting { background: var(--line); color: var(--text); }
 /* 「👤 生徒」ボタンの数字(連絡が必要な人数) */
 #open-students { position: relative; }

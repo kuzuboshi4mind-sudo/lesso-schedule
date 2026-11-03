@@ -69,6 +69,14 @@ export function initStudents(opts) {
       await refreshAfterSend();
     } else if (e.target.closest('[data-confirm]')) {
       await confirmChecked();
+    } else if (e.target.closest('[data-rescheduled]')) {
+      // キャンセルの振替が済んだ:「振替が必要」から外す
+      const id = e.target.closest('[data-rescheduled]').dataset.rescheduled;
+      const lesson = editing.reschedule.find(l => l.id === id);
+      if (!lesson) return;
+      await store.markRescheduled(editing.name, lesson);
+      await refreshAfterSend();
+      showToast(`振替済みにしました(「戻す」で元に戻せます)`);
     }
   });
   // Mac:⌘S / ⌘return で保存
@@ -111,7 +119,8 @@ function renderList() {
     const slots = s.slots.map(sl => `↻ ${escapeHtml(store.slotLabel(sl))}`).join('　');
     const next = s.next ? `次:${dateLabel(s.next.date)} ${s.next.start}` : '';
     const badge = s.group === 'todo'
-      ? `<span class="student-badge">未送信 ${s.unsent.length}件</span>`
+      ? [s.unsentNow.length ? `<span class="student-badge">未送信 ${s.unsentNow.length}件</span>` : '',
+        s.reschedule.length ? `<span class="student-badge reschedule">振替が必要 ${s.reschedule.length}件</span>` : ''].join('')
       : s.group === 'waiting'
         ? `<span class="student-badge waiting">送信済み ${sentLabel(s.sentAt)}・仮 ${s.tentative.length}件</span>`
         : '';
@@ -136,9 +145,9 @@ function renderList() {
 
 // 一覧のまとまり(上から順に並べる)
 const GROUPS = [
-  { id: 'todo', label: '連絡が必要:仮の予定をまだ LINE で送っていない' },
-  { id: 'waiting', label: '返事待ち:仮の予定を LINE で送った' },
-  { id: 'confirmed', label: '確定済み:これからの予定は全部確約' },
+  { id: 'todo', label: '連絡が必要:今月の仮の予定をまだ LINE で送っていない・キャンセルの振替が必要' },
+  { id: 'waiting', label: '返事待ち:今月の仮の予定を LINE で送った' },
+  { id: 'confirmed', label: '確定済み:今月の予定は全部確約' },
   { id: 'none', label: 'これからの予定なし' },
 ];
 
@@ -164,8 +173,17 @@ async function refreshAfterSend() {
 // 仮の予定の一覧(チェックをつけた予定を「確約」にできる。LINE で送った予定は、はじめからチェック済み)
 function renderSent() {
   const s = editing;
-  if (!s?.name || !s.tentative?.length) { f.sent.hidden = true; return; }
+  if (!s?.name || (!s.tentative?.length && !s.reschedule?.length)) { f.sent.hidden = true; return; }
   f.sent.hidden = false;
+  // キャンセルした予定:振替(リスケ)が必要。振替の予定を入れたら「振替済み」を押す
+  const typeName0 = Object.fromEntries(types.map(t => [t.id, t.name]));
+  const reschedule = s.reschedule?.length ? `<div class="reschedule-box">
+      <p class="sent-head"><strong>振替が必要なキャンセル ${s.reschedule.length}件</strong>(振替の予定を入れたら「振替済み」を押してください)</p>
+      <ul class="tentative-list">${s.reschedule.map(l => `<li class="reschedule-item">
+        <span>${dateLabel(l.date)} ${l.start}〜 ${l.duration}分 ${escapeHtml(typeName0[l.typeId] || '')} キャンセル</span>
+        <button type="button" class="btn btn-small" data-rescheduled="${escapeHtml(l.id)}">振替済み</button>
+      </li>`).join('')}</ul></div>` : '';
+  if (!s.tentative?.length) { f.sent.innerHTML = reschedule; return; }
   const unsent = new Set(s.unsent.map(l => l.id));
   const anySent = s.tentative.some(l => !unsent.has(l.id));
   const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
@@ -173,7 +191,7 @@ function renderSent() {
   const head = s.unsent.length
     ? `仮の予定 ${s.tentative.length}件(<strong>${s.unsent.length}件はまだ LINE で送っていません</strong>)`
     : `仮の予定 ${s.tentative.length}件を LINE で送りました(${sentLabel(s.sentAt)})。<strong>返事待ち</strong>`;
-  f.sent.innerHTML = `<p class="sent-head">${head}</p>
+  f.sent.innerHTML = `${reschedule}<p class="sent-head">${head}</p>
     <ul class="tentative-list">${sorted.map(l => `<li><label>
       <input type="checkbox" value="${escapeHtml(l.id)}" ${!anySent || !unsent.has(l.id) ? 'checked' : ''}>
       ${dateLabel(l.date)} ${l.start}〜 ${l.duration}分 ${escapeHtml(typeName[l.typeId] || '')}${l.recurring ? ' ↻' : ''}
