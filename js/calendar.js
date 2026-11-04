@@ -103,7 +103,7 @@ function layoutLanes(lessons) {
   return result;
 }
 
-const STATUS_LABEL = { tentative: '仮', confirmed: '確約', cancelled: 'キャンセル', none: '' };
+const STATUS_LABEL = { tentative: '仮', confirmed: '確約', absent: '欠席', cancelled: 'キャンセル', none: '' };
 
 // レッスン1件のブロック(Numbers と同じく、マスいっぱいに種類の色で塗る)
 // 確約=濃い色(印なし)、仮=薄い色+点線、キャンセル=赤い×、なし(自分の予定)=塗らずに小さな字
@@ -119,6 +119,7 @@ function lessonBlock(lesson, type, pos, solo = false) {
   const end = fromMinutes(toMinutes(lesson.start) + lesson.duration);
   const name = escapeHtml(lesson.student || '(名前なし)');
   const label = status === 'cancelled' ? `${name}<span class="lesson-mark ng" aria-label="キャンセル">✕</span>`
+    : status === 'absent' ? `${name}<span class="lesson-mark absent" aria-label="欠席">欠</span>`
     : name;
   // 15分・20分の予定が1マスに1件だけのときは、Numbers のようにマスいっぱいに塗り、長さを小さく添える
   const fill = solo && lesson.duration < 30;

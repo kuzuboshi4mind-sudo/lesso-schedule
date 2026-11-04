@@ -1,5 +1,6 @@
 // 集計:月の合計時間と、種類ごとの時間数
 // ・合計に入れるのは「確約」だけ。「仮」は参考として別に数える
+// ・「欠席」は消化したレッスンなので、確約と同じに数える(2026-11-04)
 // ・「キャンセル」「なし(自分の予定)」と、設定で「集計に入れない」にした種類は合計に入れない
 // ・集計に入れない種類(ライブ・サウナ・釣りなど)は、レッスンとは別に種類ごとの時間を出す
 //   (キャンセル以外は状態にかかわらず数える。書き込み用の「その他」は出さない)
@@ -23,7 +24,8 @@ export function computeSummary(lessons, types, rules) {
   let excluded = 0;
 
   for (const l of lessons) {
-    const status = l.status || 'tentative';
+    const raw = l.status || 'tentative';
+    const status = raw === 'absent' ? 'confirmed' : raw;
     const type = typeById[l.typeId];
     if (type && !type.countInTotal && type.id !== 'other' && status !== 'cancelled') {
       if (!otherByType.has(type.id)) otherByType.set(type.id, { type, count: 0, hours: 0 });

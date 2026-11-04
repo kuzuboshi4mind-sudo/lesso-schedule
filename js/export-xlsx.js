@@ -63,7 +63,8 @@ const side = (color, style = 'thin') => ({ style, color: { argb: color } });
 // 確約の「○」と「60分」「45分」などの長さは出さない(2026-10-31 本人の希望。長さはつなげたマスの高さでわかる)
 function lessonLabel(l) {
   const name = l.student || '(名前なし)';
-  return (l.status || 'tentative') === 'cancelled' ? `×${name}` : name;
+  const status = l.status || 'tentative';
+  return status === 'cancelled' ? `×${name}` : status === 'absent' ? `${name}(欠)` : name;
 }
 // 120分より長い予定だけ、終わりの時刻(「〜22:00」)を添える
 function durationLabel(l) {
@@ -78,7 +79,7 @@ function lessonStyle(l, type) {
   if (type?.id === 'other') {
     return { fill: fill(argb(color)), font: { strike: status === 'cancelled', color: { argb: COLORS.text } } };
   }
-  if (status === 'confirmed') {
+  if (status === 'confirmed' || status === 'absent') {
     return { fill: fill(argb(color)), font: { bold: true, color: { argb: argb(textColorFor(color)) } } };
   }
   if (status === 'cancelled') {

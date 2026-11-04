@@ -260,7 +260,7 @@ function renderMemoApp(name) {
 async function infoHtml(student) {
   const upcoming = await store.getUpcomingLessons(student.name);
   const typeName = Object.fromEntries(types.map(t => [t.id, t.name]));
-  const status = { confirmed: '確約', tentative: '仮', cancelled: 'キャンセル', none: '' };
+  const status = { confirmed: '確約', tentative: '仮', absent: '欠席', cancelled: 'キャンセル', none: '' };
   const slots = student.slots.length
     ? `<ul class="student-lessons">${student.slots.map(sl => `<li>↻ ${escapeHtml(store.slotLabel(sl))}(${sl.duration}分・${escapeHtml(typeName[sl.typeId] || '')})</li>`).join('')}</ul>`
     : '<p class="muted">なし</p>';

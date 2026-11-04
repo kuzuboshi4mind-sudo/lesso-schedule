@@ -38,10 +38,12 @@ const DEFAULT_TYPES = [
 export const NUMBERS_COLORS = Object.fromEntries(DEFAULT_TYPES.map(t => [t.id, t.color]));
 
 // 予定の状態。仮=まだ確定していない、確約=確定(○)、キャンセル(×)、
+// 欠席=生徒が休んだが、レッスンは消化したものとして数える(確約と同じく集計に入れる。振替は不要。2026-11-04)
 // なし=レッスン以外の自分の予定(仮・確約の区別がないもの)
 export const STATUSES = [
   { id: 'tentative', label: '仮' },
   { id: 'confirmed', label: '確約 ○' },
+  { id: 'absent', label: '欠席(消化)' },
   { id: 'cancelled', label: 'キャンセル ×' },
   { id: 'none', label: 'なし(自分の予定)' },
 ];

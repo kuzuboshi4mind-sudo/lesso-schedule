@@ -312,7 +312,8 @@ body {
 /* =========================================================
    予定の状態:確約=濃い色+◯、仮=薄い色+点線、キャンセル=灰色+×
    ========================================================= */
-.lesson.confirmed {
+.lesson.confirmed,
+.lesson.absent {
   background: var(--type-color);
 }
 .lesson.tentative {
@@ -353,6 +354,7 @@ body {
   border: 2px dashed var(--accent);
   color: var(--text);
 }
+.chip.status-absent input:checked + span { background: #e07b1a; border-color: #e07b1a; color: #fff; }
 .chip.status-cancelled input:checked + span { background: var(--danger); border-color: var(--danger); color: #fff; }
 .chip.status-none input:checked + span {
   background: var(--surface);
@@ -1200,8 +1202,14 @@ body.month-tentative .calendar-scroll { border-top: 4px dashed var(--tentative);
   font-weight: 600;
 }
 .calendar .lesson.confirmed,
+.calendar .lesson.absent,
 .calendar .lesson.tentative,
 .calendar .lesson.cancelled { background: var(--type-color); color: var(--nb-cell-text); }
+/* 欠席:確約と同じ濃い色に、オレンジの「欠」(消化したレッスン。2026-11-04) */
+.lesson-mark.absent {
+  display: inline-block; margin-left: 2px; padding: 0 2px; border-radius: 3px;
+  background: #e07b1a; color: #fff; font-size: 0.75em; font-weight: 700; line-height: 1.3; vertical-align: 0.05em;
+}
 /* 30分ごとの行に1行ずつ。はみ出た文字は切る(折り返さない) */
 .calendar .lesson .lesson-name,
 .calendar .lesson .lesson-line {
@@ -1307,8 +1315,10 @@ body.day-view .calendar .row-date th[data-date] { font-size: 1.2em; }
    ========================================================= */
 :root { --pastel: 62%; --pastel-tentative: 32%; }
 .calendar .lesson.confirmed,
+.calendar .lesson.absent,
 .calendar .lesson.cancelled,
 .legend-lesson.lesson.confirmed,
+.legend-lesson.lesson.absent,
 .legend-lesson.lesson.cancelled { background: color-mix(in srgb, var(--type-color) var(--pastel), #ffffff); }
 .calendar .lesson.tentative,
 .legend-lesson.lesson.tentative { background: color-mix(in srgb, var(--type-color) var(--pastel-tentative), #ffffff); }

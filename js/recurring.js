@@ -9,7 +9,7 @@ const skipTo = document.getElementById('skip-to');
 let onChanged = () => {};
 let types = [];
 
-const STATUS_NAME = { tentative: '仮', confirmed: '確約', cancelled: 'キャンセル', none: 'なし' };
+const STATUS_NAME = { tentative: '仮', confirmed: '確約', absent: '欠席', cancelled: 'キャンセル', none: 'なし' };
 
 export function initRecurring(opts) {
   onChanged = opts.onChanged;
