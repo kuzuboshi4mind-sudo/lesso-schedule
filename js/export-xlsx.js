@@ -64,7 +64,7 @@ const side = (color, style = 'thin') => ({ style, color: { argb: color } });
 function lessonLabel(l) {
   const name = l.student || '(名前なし)';
   const status = l.status || 'tentative';
-  return status === 'cancelled' ? `×${name}` : status === 'absent' ? `${name}(欠)` : name;
+  return status === 'cancelled' ? `×${name}` : status === 'absent' ? `(欠)${name}` : name;
 }
 // 120分より長い予定だけ、終わりの時刻(「〜22:00」)を添える
 function durationLabel(l) {
