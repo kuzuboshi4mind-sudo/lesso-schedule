@@ -6,7 +6,7 @@ import { initSelection, afterRender, handleTap, clearSelection } from './selecti
 import { initSettings } from './settings.js';
 import { initZoom, refreshZoom, fitDayHeight } from './zoom.js';
 import { requireLogin, watchLogout, logout } from './login.js';
-import { initTrashBackup, showLastBackup } from './trash-backup.js';
+import { initTrashBackup, showLastBackup, checkBackupReminder } from './trash-backup.js';
 import { initRecurring } from './recurring.js';
 import { initStudents } from './students.js';
 import { initLineShare } from './line-share.js';
@@ -21,7 +21,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '欠席の印を名前の前に(2026-11-05)';
+const APP_VERSION = '圏外でも見られる写し・自動バックアップ(2026-11-09)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -244,11 +244,62 @@ window.addEventListener('unhandledrejection', e => {
   alert(e.reason?.message || '保存できませんでした。もう一度試してください。');
 });
 
+// ---- クラウドにつながらないとき(この端末の写しを読むだけで表示する。2026-11-09)----
+const offlineBanner = document.getElementById('offline-banner');
+const offlineText = document.getElementById('offline-text');
+function showOfflineBanner() {
+  const info = store.deviceCopyInfo();
+  const when = info ? new Date(info.savedAt) : null;
+  const at = when ? `${when.getMonth() + 1}月${when.getDate()}日 ${when.getHours()}:${pad(when.getMinutes())}` : '';
+  offlineText.textContent = navigator.onLine === false
+    ? `圏外のため、この端末の写し(${at} 時点)を表示しています。見るだけで、変更はできません。`
+    : `クラウドにつながらないため、この端末の写し(${at} 時点)を表示しています。見るだけで、変更はできません。`;
+  offlineBanner.hidden = false;
+  document.body.classList.add('offline');
+}
+store.onOfflineChange(showOfflineBanner);
+// 電波が戻ったら、つなぎ直せることを知らせる
+window.addEventListener('online', () => {
+  if (store.isOffline()) offlineText.textContent = '通信が戻りました。「つなぎ直す」を押すと、最新の予定を読み込みます。';
+});
+document.getElementById('offline-retry').addEventListener('click', () => location.reload());
+
+// この端末の写しを作り直す(アプリを開いたとき・30分以上たってから戻ってきたとき)
+let lastRefresh = 0;
+async function refreshCopy() {
+  if (!store.usesDeviceCopy || store.isOffline()) return;
+  lastRefresh = Date.now();
+  try {
+    await store.refreshDeviceCopy();
+  } catch (err) {
+    console.warn('この端末の写しを作り直せませんでした', err);
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && lastRefresh && Date.now() - lastRefresh > 30 * 60000) refreshCopy();
+});
+
+// 画面のファイルを端末に残す係(sw.js)を登録する(圏外でもホーム画面から開けるように)
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js').catch(err => console.warn(err));
+  // 開いたときに読み込んだファイルを残してもらう(部品の読み込みが終わるのを少し待つ)
+  setTimeout(() => {
+    navigator.serviceWorker.ready.then(reg => {
+      const urls = [location.href.split('#')[0], ...performance.getEntriesByType('resource').map(e => e.name)];
+      reg.active?.postMessage({ type: 'cache-urls', urls });
+    }).catch(() => {});
+  }, 4000);
+}
+
 // 起動:クラウド保存ならログインを待ってから表を出す
 async function start() {
+  registerServiceWorker();
   const user = await requireLogin();
   const info = document.getElementById('account-info');
-  if (user) {
+  if (user?.offline) {
+    info.textContent = `クラウドにつながらないため、この端末の写しを表示しています(${user.email || ''})。見るだけで、変更はできません。`;
+  } else if (user) {
     info.textContent = `クラウドに保存しています(${user.email} でログイン中)。どの端末からも同じデータが見られます。`;
     const btn = document.getElementById('logout');
     btn.hidden = false;
@@ -257,9 +308,13 @@ async function start() {
   } else {
     info.textContent = 'この端末の中に保存しています(クラウドは未設定)。ほかの端末とは共有されません。';
   }
-  show();
+  await show();
+  if (store.isOffline()) return;
   // 30日より前にゴミ箱に入れた予定を完全に消す(失敗しても表示には影響しない)
-  store.purgeOldTrash().catch(err => console.warn(err));
+  // そのあとで、この端末の写しを作り直す(消したものが写しに残らないように)
+  await store.purgeOldTrash().catch(err => console.warn(err));
+  await refreshCopy();
+  checkBackupReminder().catch(err => console.warn(err));
 }
 
 start();

@@ -1,13 +1,25 @@
 // データの読み書きの窓口
 // 画面側のコードは「await store.〇〇()」でここを呼ぶ。保存先の違いはここで吸収する。
-// ・config.js に Supabase の接続先があれば:クラウド(backend-cloud.js)
+// ・config.js に Supabase の接続先があれば:クラウド+この端末の写し(backend-cached.js → backend-cloud.js)
+//   クラウドにつながらないときは、この端末の写しを読むだけで表示する(2026-11-09)
 // ・なければ:この端末の中(backend-local.js)
 // 「前回の入力」だけは、端末ごとの使い勝手なので、いつも端末の中に保存する。
 import { cloudEnabled } from './cloud.js';
 import * as local from './backend-local.js';
-import * as cloud from './backend-cloud.js';
+import * as cached from './backend-cached.js';
 
-const db = cloudEnabled ? cloud : local;
+const db = cloudEnabled ? cached : local;
+
+// ---- この端末の写し(クラウド保存のときだけ)----
+export const usesDeviceCopy = cloudEnabled;
+export const isOffline = () => cloudEnabled && cached.isOffline();
+export const onOfflineChange = fn => { if (cloudEnabled) cached.onOfflineChange(fn); };
+export const deviceCopyInfo = () => (cloudEnabled ? cached.copyInfo() : null);
+export const loadDeviceCopy = () => (cloudEnabled ? cached.loadDeviceCopy() : Promise.resolve(null));
+export const goOffline = reason => (cloudEnabled ? cached.goOffline(reason) : Promise.resolve(false));
+export const refreshDeviceCopy = () => (cloudEnabled ? cached.refreshDeviceCopy() : Promise.resolve(false));
+export const listDayCopies = () => (cloudEnabled ? cached.listDayCopies() : Promise.resolve([]));
+export const clearDeviceCopies = () => (cloudEnabled ? cached.clearDeviceCopies() : Promise.resolve());
 
 // 保存先の名前(「クラウド」か「この端末」)
 export const storageLabel = db.label;
@@ -572,12 +584,16 @@ const LAST_BACKUP_KEY = 'lesso.lastBackupAt';
 
 // 書き出すデータを作る。month を省くと全部
 // 形:{ app, version, kind:'month'|'all', months:['2026-10'], exportedAt, lessons:[...], dayNotes:{...}, settings:{...} }
-export async function buildBackup(year, month) {
+// src を渡すと、そこから読む(この端末に残した日ごとの写しを書き出すとき)
+export async function buildBackup(year, month, src = null) {
+  const s = src || db;
+  const setting = (key, fallback) => s.getSetting(key).then(v => v || fallback);
   const [from, to] = year ? monthRange(year, month) : [ALL_FROM, ALL_TO];
   const [lessons, dayNotes, types, durationRules, slots, exceptions, students, hiddenStudents, tentativeMonths, studentExtras, allColors] = await Promise.all([
-    db.listLessons(from, to), db.listNotes(from, to), getTypes(), getDurationRules(),
-    db.listSlots(), db.listExceptions(ALL_FROM, ALL_TO), db.listStudents(), getHiddenStudents(), db.listMonths(), getStudentExtras(),
-    allCellColors(),
+    s.listLessons(from, to), s.listNotes(from, to), src ? setting('types', DEFAULT_TYPES) : getTypes(),
+    setting('durationRules', DEFAULT_DURATION_RULES),
+    s.listSlots(), s.listExceptions(ALL_FROM, ALL_TO), s.listStudents(), setting('hiddenStudents', []), s.listMonths(),
+    setting('studentExtras', {}), setting('cellColors', {}),
   ]);
   const months = year
     ? [`${year}-${String(month).padStart(2, '0')}`]
@@ -595,13 +611,36 @@ export async function buildBackup(year, month) {
   };
 }
 
-export function markBackedUp() {
-  try { localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString()); } catch { /* 記録できなくても続ける */ }
+// 書き出した日時を記録する(この端末に。「全部」のときはクラウドにも記録して、どの端末でも同じ日付にする)
+// 「戻す」の対象にはしない
+export async function markBackedUp(all = false) {
+  const now = new Date().toISOString();
+  try { localStorage.setItem(LAST_BACKUP_KEY, now); } catch { /* 記録できなくても続ける */ }
+  if (all) {
+    try { localStorage.setItem(LAST_FULL_BACKUP_KEY, now); } catch { /* 記録できなくても続ける */ }
+    if (!isOffline()) await db.setSetting('lastFullBackupAt', now).catch(err => console.warn(err));
+  }
 }
 
 // 最後に書き出した日時(この端末で。なければ null)
 export function lastBackupAt() {
   try { return localStorage.getItem(LAST_BACKUP_KEY); } catch { return null; }
+}
+
+// 最後に「全部」を書き出した日時(どの端末からでも。なければ null)
+const LAST_FULL_BACKUP_KEY = 'lesso.lastFullBackupAt';
+export async function lastFullBackupAt() {
+  let here = null;
+  try { here = localStorage.getItem(LAST_FULL_BACKUP_KEY); } catch { /* なし */ }
+  const shared = await db.getSetting('lastFullBackupAt').catch(() => null);
+  return [here, shared].filter(Boolean).sort().at(-1) || null;
+}
+
+// この端末に残した日ごとの写しを、バックアップファイルの形にする
+export async function buildBackupFromDayCopy(id) {
+  const src = cloudEnabled ? await cached.dayCopyBackend(id) : null;
+  if (!src) throw new Error('この端末の写しが見つかりませんでした');
+  return buildBackup(null, null, src);
 }
 
 // 2つの予定の中身が同じか(ゴミ箱の印は比べない)

@@ -71,6 +71,18 @@
     </div>
   </header>
 
+  <!-- クラウドにつながらないとき:この端末の写しを読むだけで表示している知らせ(2026-11-09) -->
+  <div id="offline-banner" class="notice-bar notice-offline" role="status" hidden>
+    <span id="offline-text" class="notice-text"></span>
+    <button type="button" id="offline-retry" class="btn btn-small">つなぎ直す</button>
+  </div>
+  <!-- 「全部」の書き出しから7日たったときの声かけ(2026-11-09) -->
+  <div id="backup-reminder" class="notice-bar" role="status" hidden>
+    <span id="backup-reminder-text" class="notice-text"></span>
+    <button type="button" id="backup-reminder-export" class="btn btn-small btn-primary">今すぐ書き出す</button>
+    <button type="button" id="backup-reminder-later" class="btn btn-small">あとで</button>
+  </div>
+
   <!-- 月表。この枠の中だけが縦横にスクロールする -->
   <main id="calendar-scroll" class="calendar-scroll">
     <table id="calendar" class="calendar"></table>
@@ -239,6 +251,12 @@
         <button type="button" id="import-backup" class="btn">ファイルから読み込む</button>
       </div>
       <input type="file" id="backup-file" accept=".json,application/json" hidden>
+      <div id="device-copies" hidden>
+        <h4 class="sub-head">この端末に自動で残している写し</h4>
+        <p class="sheet-note">アプリを開くたびと保存するたびに、予定の全部をこの端末の中にも写しています(日ごとに最大14日分)。クラウドにつながらないときは、いちばん新しい写しを読むだけで表示します。下の「書き出す」で、その日の写しをバックアップファイルにできます(読み込みは上の「ファイルから読み込む」から)。</p>
+        <p id="device-copy-status" class="sheet-note"></p>
+        <ul id="day-copy-list" class="day-copy-list"></ul>
+      </div>
     </section>
 
     <section class="settings-section">

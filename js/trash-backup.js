@@ -39,19 +39,106 @@ export function initTrashBackup(opts) {
   for (const d of [trashDialog, saveDialog]) {
     d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
   }
+  dayCopyList.addEventListener('click', onDayCopyClick);
+  document.getElementById('backup-reminder-export').addEventListener('click', () => {
+    reminder.hidden = true;
+    exportBackup(false);
+  });
+  document.getElementById('backup-reminder-later').addEventListener('click', () => {
+    reminder.hidden = true;
+    try { localStorage.setItem(REMIND_SNOOZE_KEY, String(Date.now())); } catch { /* 覚えられなくても続ける */ }
+  });
   showLastBackup();
 }
 
-// 設定画面を開くたびに呼ぶ(前回の書き出し日を出し直す)
-export function showLastBackup() {
+function daysSince(iso) {
+  return Math.floor((Date.now() - new Date(iso)) / 86400000);
+}
+function shortDate(iso) {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+function timeLabel(iso) {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// 設定画面を開くたびに呼ぶ(前回の書き出し日・この端末の写しを出し直す)
+export async function showLastBackup() {
   const at = store.lastBackupAt();
-  if (!at) {
-    lastBackup.textContent = 'この端末からは、まだ書き出していません。月に1回くらい書き出しておくと安心です。';
-    return;
+  const full = await store.lastFullBackupAt();
+  const lines = [];
+  if (full) {
+    const days = daysSince(full);
+    lines.push(`前回の「全部」の書き出し(どの端末からでも):${shortDate(full)}(${days}日前)${days >= REMIND_DAYS ? ' — そろそろ書き出しておきましょう' : ''}`);
+  } else {
+    lines.push('「全部を書き出す」は、まだ一度もしていません。週に1回くらい書き出して、iCloud Drive などに保管しておくと安心です。');
   }
-  const d = new Date(at);
-  const days = Math.floor((Date.now() - d) / 86400000);
-  lastBackup.textContent = `前回の書き出し:${d.getMonth() + 1}月${d.getDate()}日(${days}日前)${days >= 30 ? ' — そろそろ書き出しておきましょう' : ''}`;
+  if (at && at !== full) lines.push(`この端末での前回の書き出し:${shortDate(at)}(${daysSince(at)}日前)`);
+  lastBackup.textContent = lines.join('\n');
+  renderDayCopies();
+}
+
+// ---------------------------------------------------------
+// 「全部」の書き出しから7日たったら、アプリを開いたときに声をかける(「あとで」なら1日おく)
+// ---------------------------------------------------------
+const REMIND_DAYS = 7;
+const REMIND_SNOOZE_KEY = 'lesso.backupRemindSnooze';
+const reminder = document.getElementById('backup-reminder');
+const reminderText = document.getElementById('backup-reminder-text');
+
+export async function checkBackupReminder() {
+  if (store.isOffline()) return;
+  try {
+    const snooze = Number(localStorage.getItem(REMIND_SNOOZE_KEY) || 0);
+    if (Date.now() - snooze < 86400000) return;
+  } catch { /* 読めなければ声をかける */ }
+  const full = await store.lastFullBackupAt();
+  const days = full ? daysSince(full) : null;
+  if (days !== null && days < REMIND_DAYS) return;
+  reminderText.textContent = full
+    ? `前回の「全部」のバックアップから${days}日たちました。書き出して「ファイル」(iCloud Drive)に保存しておきましょう。`
+    : 'まだ「全部」のバックアップを書き出していません。書き出して「ファイル」(iCloud Drive)に保存しておきましょう。';
+  reminder.hidden = false;
+}
+
+// ---------------------------------------------------------
+// この端末に残している写し(日ごと)
+// ---------------------------------------------------------
+const dayCopies = document.getElementById('device-copies');
+const dayCopyList = document.getElementById('day-copy-list');
+const dayCopyStatus = document.getElementById('device-copy-status');
+
+async function renderDayCopies() {
+  if (!store.usesDeviceCopy) return;
+  dayCopies.hidden = false;
+  const info = store.deviceCopyInfo() || await store.loadDeviceCopy();
+  dayCopyStatus.textContent = info
+    ? `いちばん新しい写し:${timeLabel(info.savedAt)}${store.isOffline() ? '(いまはこの写しを表示しています)' : ''}`
+    : 'まだこの端末に写しがありません(クラウドにつながった状態で開くと作ります)。';
+  const list = await store.listDayCopies();
+  dayCopyList.innerHTML = list.map(c => {
+    const [y, m, d] = c.day.split('-').map(Number);
+    return `<li class="day-copy-row">
+      <span><strong>${m}/${d}(${WEEKDAYS[new Date(y, m - 1, d).getDay()]})</strong> の写し <small>${timeLabel(c.savedAt)} 時点・予定${c.lessons}件</small></span>
+      <button type="button" class="btn btn-small" data-copy="${escapeHtml(c.id)}">書き出す</button>
+    </li>`;
+  }).join('');
+}
+
+async function onDayCopyClick(e) {
+  const btn = e.target.closest('[data-copy]');
+  if (!btn) return;
+  try {
+    const data = await store.buildBackupFromDayCopy(btn.dataset.copy);
+    const day = btn.dataset.copy.slice(4).replaceAll('-', '');
+    const name = `lesson-backup-all-${day}-device.json`;
+    const file = new File([JSON.stringify(data, null, 2)], name, { type: 'application/json' });
+    offerFile(file, 'この端末の写しを保存',
+      `${name}(${btn.dataset.copy.slice(4)} の写し・予定${data.lessons.length}件)。読み込むときは「ファイルから読み込む」から選びます。`);
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 function dateLabel(date) {
@@ -113,7 +200,7 @@ async function exportBackup(thisMonthOnly) {
   const file = new File([JSON.stringify(data, null, 2)], name, { type: 'application/json' });
   offerFile(file, 'バックアップを保存',
     `${name}(予定${data.lessons.length}件・${data.months.length ? data.months.join('、') : '予定なし'})`,
-    () => { store.markBackedUp(); showLastBackup(); });
+    async () => { await store.markBackedUp(!m); reminder.hidden = true; showLastBackup(); });
 }
 
 // できたファイルを保存する画面を出す(「ファイルを保存」と、使える端末では「共有…」)

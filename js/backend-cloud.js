@@ -119,6 +119,12 @@ export async function getSetting(key) {
   return rows[0]?.value;
 }
 
+// 設定を全部({ キー:値 })。端末の写しを作るときに使う
+export async function listSettings() {
+  const rows = await readAll(() => supabase.from('user_settings').select('key,value'), 'key');
+  return Object.fromEntries(rows.map(r => [r.key, r.value]));
+}
+
 export async function setSetting(key, value) {
   check(await supabase.from('user_settings').upsert({ key, value }, { onConflict: 'user_id,key' }));
 }
