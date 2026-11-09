@@ -13,6 +13,7 @@ import { initLineShare } from './line-share.js';
 import { initSummary, updateSummary } from './summary.js';
 import { initInlineEdit, editLessonInline, editCellInline } from './inline-edit.js';
 import { initDayMemos, openDayMemos } from './day-memos.js';
+import { initMissingStudents, updateMissingStudents } from './missing-students.js';
 
 const table = document.getElementById('calendar');
 const scroller = document.getElementById('calendar-scroll');
@@ -21,7 +22,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '圏外でも見られる写し・自動バックアップ(2026-11-09)';
+const APP_VERSION = '前月の生徒で未入力の人を表示(2026-11-09)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -91,6 +92,7 @@ async function show({ keepScroll = false } = {}) {
   renderCalendar(table, year, month, { lessons, dayNotes, types, cellColors, onlyDate: dayView ? selectedDate : null });
   renderLegend(types);
   updateSummary(year, month, lessons, types, rules);
+  updateMissingStudents(year, month, lessons, types);   // 前月の生徒で未入力の人(後ろで数える)
   // 見本の帯の高さが決まってから大きさを合わせる(1日が縦にちょうど収まるように)
   refreshZoom();
   afterRender(lessons);
@@ -238,6 +240,7 @@ initLineShare({ onChanged: () => show({ keepScroll: true }) });
 initDayMemos();
 dayMemosBtn.addEventListener('click', () => openDayMemos(selectedDate, shownLessons));
 initStudents({ onChanged: () => show({ keepScroll: true }) });
+initMissingStudents();
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)
 window.addEventListener('unhandledrejection', e => {

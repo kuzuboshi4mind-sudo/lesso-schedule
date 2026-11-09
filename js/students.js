@@ -100,6 +100,12 @@ async function openList() {
   listDialog.querySelector('h2').focus();
 }
 
+// 名前を指定して、その生徒の画面を開く(「前月の生徒」の一覧から。2026-11-09)
+export async function openStudentByName(name) {
+  [overview, types, hidden] = await Promise.all([store.getStudentOverview(), store.getTypes(), store.getHiddenStudents()]);
+  await openStudent(overview.find(s => s.name === name) || { name, id: null, memo: '', slots: [] });
+}
+
 async function loadList() {
   [overview, types, hidden] = await Promise.all([store.getStudentOverview(), store.getTypes(), store.getHiddenStudents()]);
   renderList();

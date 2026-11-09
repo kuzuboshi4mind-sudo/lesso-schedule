@@ -815,6 +815,30 @@ function isLessonLike(l, typeById) {
   return (l.status || 'tentative') !== 'none' && !!typeById[l.typeId]?.countInTotal;
 }
 
+// 前月にレッスンがあって、この月にはまだ1件も入っていない生徒(2026-11-09)
+// ・レッスンとして数える予定・固定枠だけを見る(自分の予定・集計しない種類は除く)。キャンセル・欠席も「予定がある」に数える
+// ・削除した生徒・名前のない予定は除く。名前は文字が完全に同じものを同じ人とする
+// lessons にその月の予定(表に出しているもの)を渡すと、読み直さずに使う
+// 戻り値:[{ name, typeId, prev:[前月の予定(日付・時刻の順)] }](前月の最初の予定の順)
+export async function getMissingFromPrevMonth(year, month, lessons = null) {
+  const p = new Date(year, month - 2, 1);
+  const [prevLessons, nowLessons, types, hidden] = await Promise.all([
+    getLessons(p.getFullYear(), p.getMonth() + 1), lessons || getLessons(year, month), getTypes(), getHiddenStudents(),
+  ]);
+  const typeById = Object.fromEntries(types.map(t => [t.id, t]));
+  const hiddenSet = new Set(hidden);
+  const ok = l => l.student && !hiddenSet.has(l.student) && isLessonLike(l, typeById);
+  const present = new Set(nowLessons.filter(ok).map(l => l.student));
+  const byName = new Map();
+  const sorted = prevLessons.filter(l => ok(l) && !present.has(l.student))
+    .sort((a, b) => a.date.localeCompare(b.date) || toMin(a.start) - toMin(b.start));
+  for (const l of sorted) {
+    if (!byName.has(l.student)) byName.set(l.student, { name: l.student, typeId: l.typeId, prev: [] });
+    byName.get(l.student).prev.push(l);
+  }
+  return [...byName.values()];
+}
+
 // 端末の時計での今日('2026-10-15')
 function localToday() {
   const d = new Date();

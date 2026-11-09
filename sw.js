@@ -15,7 +15,7 @@ const CORE = [
   'js/backend-cached.js', 'js/backend-cloud.js', 'js/backend-local.js', 'js/backend-memory.js', 'js/device-copy.js',
   'js/calendar.js', 'js/day-memos.js', 'js/editor.js', 'js/export-xlsx.js', 'js/holidays.js', 'js/inline-edit.js',
   'js/line-share.js', 'js/memo-link.js', 'js/recurring.js', 'js/selection.js', 'js/settings.js', 'js/students.js',
-  'js/summary.js', 'js/trash-backup.js', 'js/zoom.js',
+  'js/summary.js', 'js/trash-backup.js', 'js/zoom.js', 'js/missing-students.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm',
 ];
 

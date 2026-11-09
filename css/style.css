@@ -1429,3 +1429,34 @@ body.offline .calendar-scroll { border-top: 4px solid var(--tentative); }
 }
 .day-copy-row small { color: var(--muted); margin-left: 6px; }
 .day-copy-row .btn { flex: none; white-space: nowrap; }
+
+/* 前月の生徒で、この月にまだ予定がない人(2026-11-09) */
+.missing-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 2px dashed var(--tentative);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.missing-chip[hidden] { display: none; }
+.missing-chip strong { color: var(--tentative); font-size: 1.05rem; }
+@media (max-width: 600px), (max-height: 500px) {
+  .missing-chip { min-height: 36px; padding: 0 10px; font-size: 0.85rem; }
+}
+.missing-list { list-style: none; margin: 0; padding: 0; }
+.missing-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.missing-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.missing-main small { color: var(--muted); font-size: 0.85rem; }
+.missing-row .btn { flex: none; white-space: nowrap; }
+.missing-empty { padding: 12px 0; color: var(--muted); }

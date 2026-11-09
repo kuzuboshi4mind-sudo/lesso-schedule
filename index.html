@@ -45,6 +45,8 @@
       <button type="button" id="month-status" class="month-status" aria-pressed="false" title="タップで「仮」と「確定」を切り替えます">確定</button>
       <!-- その月の集計(タップで詳しく) -->
       <button type="button" id="summary-chip" class="summary-chip" aria-label="この月の集計を見る"></button>
+      <!-- 前月にレッスンがあって、この月にまだ予定がない生徒(いるときだけ出す。2026-11-09) -->
+      <button type="button" id="missing-chip" class="missing-chip" hidden></button>
     </div>
     <nav class="month-nav" aria-label="月の切り替え">
       <button type="button" id="prev-month" class="btn" aria-label="前の月">◀<span class="btn-label"> 前月</span></button>
@@ -350,6 +352,16 @@
       <button type="button" class="btn btn-primary" data-close>閉じる</button>
     </div>
     <div id="summary-body"></div>
+  </dialog>
+
+  <!-- 前月の生徒で、この月にまだ予定がない人 -->
+  <dialog id="missing-dialog" class="sheet">
+    <div class="sheet-head">
+      <h2 id="missing-title" tabindex="-1">前月の生徒</h2>
+      <button type="button" class="btn btn-primary" data-close>閉じる</button>
+    </div>
+    <p id="missing-note" class="sheet-note"></p>
+    <ul id="missing-list" class="missing-list"></ul>
   </dialog>
 
   <!-- 生徒メモの一覧 -->
