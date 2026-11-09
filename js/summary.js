@@ -75,11 +75,13 @@ export function initSummary() {
 }
 
 // 表を描き直すたびに呼ぶ(上の帯の合計と、集計の画面の中身を作り直す)
-export function updateSummary(year, month, lessons, types, rules) {
+// showMonth:1日表示のときは「11月 確約 ○h」と月を添える(その日の時間と読まれないように。2026-11-09)
+export function updateSummary(year, month, lessons, types, rules, { showMonth = false } = {}) {
   const s = computeSummary(lessons, types, rules);
   last = s;
   const tentative = s.total.tentative.count ? `(仮 ${formatHours(s.total.tentative.hours)}h)` : '';
-  chip.innerHTML = `確約 <strong>${formatHours(s.total.confirmed.hours)}h</strong>${tentative}`;
+  chip.innerHTML = `${showMonth ? `${month}月 ` : ''}確約 <strong>${formatHours(s.total.confirmed.hours)}h</strong>${tentative}`;
+  chip.setAttribute('aria-label', `${month}月の集計を見る`);
   title.textContent = `${year}年${month}月の集計`;
 
   const cell = b => (b.count ? `${b.count}件<br><strong>${formatHours(b.hours)}h</strong>` : '<span class="muted">—</span>');

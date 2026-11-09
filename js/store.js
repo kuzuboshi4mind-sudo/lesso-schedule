@@ -54,9 +54,9 @@ export const NUMBERS_COLORS = Object.fromEntries(DEFAULT_TYPES.map(t => [t.id, t
 // なし=レッスン以外の自分の予定(仮・確約の区別がないもの)
 export const STATUSES = [
   { id: 'tentative', label: '仮' },
-  { id: 'confirmed', label: '確約 ○' },
+  { id: 'confirmed', label: '確約' },
   { id: 'absent', label: '欠席(消化)' },
-  { id: 'cancelled', label: 'キャンセル ×' },
+  { id: 'cancelled', label: 'キャンセル' },
   { id: 'none', label: 'なし(自分の予定)' },
 ];
 

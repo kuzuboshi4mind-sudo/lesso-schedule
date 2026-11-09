@@ -156,6 +156,8 @@
         <input type="text" id="lesson-student" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="例:山田 / 練習">
         <!-- 前に入れた名前の候補(タップで入る) -->
         <div id="student-suggest" class="suggest" hidden></div>
+        <!-- はじめて入れる名前のとき(似た名前があれば候補を出す。2026-11-09) -->
+        <div id="lesson-new-name" class="new-name-hint" hidden></div>
         <!-- その生徒の生徒メモ(あるときだけ出る) -->
         <p id="lesson-student-memo" class="student-memo-hint" hidden></p>
         <!-- この生徒に今月・来月の予定を LINE で送る(名前があるときだけ出る) -->

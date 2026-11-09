@@ -22,7 +22,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '前月の生徒で未入力の人を表示(2026-11-09)';
+const APP_VERSION = '戻ったら最新に・はじめての名前の知らせ(2026-11-09)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -91,7 +91,7 @@ async function show({ keepScroll = false } = {}) {
   const { scrollLeft, scrollTop } = scroller;
   renderCalendar(table, year, month, { lessons, dayNotes, types, cellColors, onlyDate: dayView ? selectedDate : null });
   renderLegend(types);
-  updateSummary(year, month, lessons, types, rules);
+  updateSummary(year, month, lessons, types, rules, { showMonth: dayView });
   updateMissingStudents(year, month, lessons, types);   // 前月の生徒で未入力の人(後ろで数える)
   // 見本の帯の高さが決まってから大きさを合わせる(1日が縦にちょうど収まるように)
   refreshZoom();
@@ -115,18 +115,31 @@ function updateStudentsBadge() {
 }
 
 // 仮の月:月の名前の横の印を「仮」に、表の見出しをオレンジの点線で囲む
+// 1日表示のときは「11月 確定」と月を添える(その日が確定と読まれないように。2026-11-09)
 function showMonthStatus(tentative) {
-  monthStatus.textContent = tentative ? '仮' : '確定';
+  const label = tentative ? '仮' : '確定';
+  monthStatus.textContent = viewMode === 'day' ? `${current.month}月 ${label}` : label;
   monthStatus.setAttribute('aria-pressed', String(tentative));
-  monthStatus.setAttribute('aria-label', tentative ? 'この月は仮です(タップで確定にする)' : 'この月は確定です(タップで仮にする)');
+  monthStatus.setAttribute('aria-label', tentative ? `${current.month}月は仮です(タップで確定にする)` : `${current.month}月は確定です(タップで仮にする)`);
   document.body.classList.toggle('month-tentative', tentative);
   document.title = `${current.month}月${tentative ? '仮' : ''} レッスンスケジュール`;
 }
 
+// 月全体が切り替わるので、確認してから切り替える(触れただけで変わらないように。2026-11-09)
 monthStatus.addEventListener('click', async () => {
   const tentative = monthStatus.getAttribute('aria-pressed') !== 'true';
+  const { year, month } = current;
+  const msg = tentative
+    ? `${month}月を「仮」にしますか?\n(月の名前と表の上がオレンジになります。「戻す」で元に戻せます)`
+    : `${month}月を「確定」にしますか?`;
+  if (!confirm(msg)) return;
   showMonthStatus(tentative);   // 先に見た目を変える(保存は後ろで)
-  await store.setTentativeMonth(current.year, current.month, tentative);
+  try {
+    await store.setTentativeMonth(year, month, tentative);
+  } catch (err) {
+    if (current.year === year && current.month === month) showMonthStatus(!tentative);   // 保存できなければ見た目を戻す
+    throw err;
+  }
 });
 
 function renderLegend(types) {
@@ -282,6 +295,31 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && lastRefresh && Date.now() - lastRefresh > 30 * 60000) refreshCopy();
 });
 
+// ---- アプリに戻ってきたら、表を最新に描き直す(2026-11-09)----
+// iPad で開きっぱなしのまま iPhone で予定を入れても、戻ったときにその予定が出るように(ダブルブッキングを防ぐ)
+// 入力画面などを開いている・長押しで選んでいる・マスに直接入力しているときは、終わってから描き直す
+let lastShownAt = Date.now();
+let redrawPending = false;
+function busy() {
+  const a = document.activeElement;
+  return !!document.querySelector('dialog[open]') || document.body.classList.contains('has-selection')
+    || (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && !a.closest('#login-screen'));
+}
+function redrawLatest() {
+  if (store.isOffline() || !document.body.classList.contains('started')) return;
+  if (busy()) { redrawPending = true; return; }
+  redrawPending = false;
+  lastShownAt = Date.now();
+  show({ keepScroll: true }).catch(err => console.warn('表を描き直せませんでした', err));
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) redrawLatest(); });
+// Mac でほかのウインドウから戻ったとき(続けて何度も来ないよう10秒あける)
+window.addEventListener('focus', () => { if (Date.now() - lastShownAt > 10000) redrawLatest(); });
+// 待っていた描き直しは、画面を閉じた・選択をやめた・入力が終わったあとに行う
+document.addEventListener('close', () => { if (redrawPending) setTimeout(redrawLatest, 50); }, true);
+document.addEventListener('focusout', () => { if (redrawPending) setTimeout(redrawLatest, 300); });
+document.addEventListener('pointerup', () => { if (redrawPending) setTimeout(redrawLatest, 300); });
+
 // 画面のファイルを端末に残す係(sw.js)を登録する(圏外でもホーム画面から開けるように)
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
@@ -312,6 +350,7 @@ async function start() {
     info.textContent = 'この端末の中に保存しています(クラウドは未設定)。ほかの端末とは共有されません。';
   }
   await show();
+  document.body.classList.add('started');   // 起動が終わった印(戻ってきたときの描き直しはこれ以降)
   if (store.isOffline()) return;
   // 30日より前にゴミ箱に入れた予定を完全に消す(失敗しても表示には影響しない)
   // そのあとで、この端末の写しを作り直す(消したものが写しに残らないように)

@@ -1460,3 +1460,21 @@ body.offline .calendar-scroll { border-top: 4px solid var(--tentative); }
 .missing-main small { color: var(--muted); font-size: 0.85rem; }
 .missing-row .btn { flex: none; white-space: nowrap; }
 .missing-empty { padding: 12px 0; color: var(--muted); }
+
+/* はじめて入れる名前の知らせ(2026-11-09) */
+.new-name-hint {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.new-name-hint[hidden] { display: none; }
+.new-name-hint.warn {
+  background: color-mix(in srgb, var(--tentative) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--tentative) 60%, transparent);
+}
+.new-name-choices { display: flex; flex-wrap: wrap; gap: 6px; }

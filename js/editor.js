@@ -26,6 +26,7 @@ const f = {
   student: document.getElementById('lesson-student'),
   suggest: document.getElementById('student-suggest'),
   studentMemo: document.getElementById('lesson-student-memo'),
+  newName: document.getElementById('lesson-new-name'),
   durations: document.getElementById('lesson-durations'),
   endField: document.getElementById('lesson-end-field'),
   end: document.getElementById('lesson-end'),
@@ -157,7 +158,42 @@ function renderStudentMemo() {
   const memo = memoMode === 'lesson' && studentMemos.find(s => s.name === f.student.value.trim())?.memo;
   f.studentMemo.hidden = !memo;
   f.studentMemo.textContent = memo ? `📝 ${memo}` : '';
+  renderNewNameHint();
 }
+
+// ---- はじめて入れる名前の知らせ(2026-11-09)----
+// 生徒は名前の文字が完全に同じかどうかで同じ人とみなすので、「あすか」と「あすかさん」は別の生徒になる。
+// レッスンの予定で、今までにない名前を入れたら知らせ、似た名前があればボタンで入れ替えられるようにする
+// 似た名前:空白・全角半角・「さん」「くん」などの呼び方をのぞいて同じ、または片方がもう片方を含む
+function nameKey(name) {
+  return name.normalize('NFKC').replace(/\s+/g, '').replace(/(さん|くん|君|ちゃん|様|さま|先生|せんせい)$/, '').toLowerCase();
+}
+function renderNewNameHint() {
+  const name = f.student.value.trim();
+  const known = new Set([...studentNames, ...studentMemos.map(s => s.name)]);
+  if (memoMode !== 'student' || !name || known.has(name) || !known.size) {
+    f.newName.hidden = true;
+    return;
+  }
+  const key = nameKey(name);
+  const similar = [...known].filter(n => {
+    const k = nameKey(n);
+    return k && key && (k === key || (Math.min(k.length, key.length) >= 2 && (k.includes(key) || key.includes(k))));
+  }).slice(0, 4);
+  f.newName.innerHTML = similar.length
+    ? `<span>⚠️ はじめて入れる名前です。同じ人なら、前と同じ名前を選んでください(文字が違うと別の生徒になります):</span>
+       <span class="new-name-choices">${similar.map(n => `<button type="button" class="suggest-item" data-name="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join('')}</span>`
+    : '<span>🆕 はじめて入れる名前です(新しい生徒として数えます)</span>';
+  f.newName.classList.toggle('warn', similar.length > 0);
+  f.newName.hidden = false;
+}
+f.newName.addEventListener('pointerdown', e => e.preventDefault());
+f.newName.addEventListener('click', e => {
+  const btn = e.target.closest('[data-name]');
+  if (!btn) return;
+  f.student.value = btn.dataset.name;
+  renderStudentMemo();
+});
 
 // ---- メモの欄:レッスンの予定なら「生徒メモ」と同じもの(2026-10-16)----
 // 名前があり、集計に入れる種類(レッスン)で、状態が「なし(自分の予定)」でないとき、メモの欄は生徒メモになる。
