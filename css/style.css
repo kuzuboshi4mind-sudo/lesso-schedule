@@ -1478,3 +1478,14 @@ body.offline .calendar-scroll { border-top: 4px solid var(--tentative); }
   border: 1px solid color-mix(in srgb, var(--tentative) 60%, transparent);
 }
 .new-name-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 未入力の一覧:外す・外した人(2026-11-19) */
+.missing-actions, .missing-choose { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex: none; }
+.missing-row.choosing { flex-wrap: wrap; }
+.missing-row.choosing .missing-choose { flex: 1 1 100%; justify-content: flex-start; padding-left: 26px; }
+.missing-off-head { margin-top: 16px; padding: 6px 0; color: var(--muted); font-size: 0.85rem; font-weight: 700; border-bottom: 1px solid var(--line); }
+.missing-row.off .missing-main strong { color: var(--muted); }
+@media (max-width: 600px) {
+  .missing-row { flex-wrap: wrap; }
+  .missing-actions { flex: 1 1 100%; justify-content: flex-start; padding-left: 26px; }
+}

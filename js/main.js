@@ -22,7 +22,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '開いたら1か月の表(2026-11-18)';
+const APP_VERSION = '未入力の一覧から外せる(2026-11-19)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -255,7 +255,7 @@ initLineShare({ onChanged: () => show({ keepScroll: true }) });
 initDayMemos();
 dayMemosBtn.addEventListener('click', () => openDayMemos(selectedDate, shownLessons));
 initStudents({ onChanged: () => show({ keepScroll: true }) });
-initMissingStudents();
+initMissingStudents({ onChanged: () => show({ keepScroll: true }) });
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)
 window.addEventListener('unhandledrejection', e => {

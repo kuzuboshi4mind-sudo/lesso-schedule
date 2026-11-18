@@ -819,12 +819,17 @@ function isLessonLike(l, typeById) {
 // ・レッスンとして数える予定・固定枠だけを見る(自分の予定・集計しない種類は除く)。キャンセル・欠席も「予定がある」に数える
 // ・削除した生徒・名前のない予定は除く。名前は文字が完全に同じものを同じ人とする
 // lessons にその月の予定(表に出しているもの)を渡すと、読み直さずに使う
-// 戻り値:[{ name, typeId, prev:[前月の予定(日付・時刻の順)] }](前月の最初の予定の順)
+// 手で外した人(2026-11-19)は items に入れず、dismissed に分ける(scope:'month'=この月だけ、'always'=今後も出さない)
+// 戻り値:{ items:[{ name, typeId, prev:[前月の予定(日付・時刻の順)] }](前月の最初の予定の順), dismissed:[{ ...同じ形, scope }] }
 export async function getMissingFromPrevMonth(year, month, lessons = null) {
   const p = new Date(year, month - 2, 1);
-  const [prevLessons, nowLessons, types, hidden] = await Promise.all([
+  const ym = ymOf(year, month);
+  const [prevLessons, nowLessons, types, hidden, dismissedSetting] = await Promise.all([
     getLessons(p.getFullYear(), p.getMonth() + 1), lessons || getLessons(year, month), getTypes(), getHiddenStudents(),
+    getMissingDismissed(),
   ]);
+  const thisMonthOff = new Set(dismissedSetting.months[ym] || []);
+  const alwaysOff = new Set(dismissedSetting.always);
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
   const hiddenSet = new Set(hidden);
   const ok = l => l.student && !hiddenSet.has(l.student) && isLessonLike(l, typeById);
@@ -836,7 +841,43 @@ export async function getMissingFromPrevMonth(year, month, lessons = null) {
     if (!byName.has(l.student)) byName.set(l.student, { name: l.student, typeId: l.typeId, prev: [] });
     byName.get(l.student).prev.push(l);
   }
-  return [...byName.values()];
+  const all = [...byName.values()];
+  const scopeOf = name => (alwaysOff.has(name) ? 'always' : thisMonthOff.has(name) ? 'month' : null);
+  return {
+    items: all.filter(s => !scopeOf(s.name)),
+    dismissed: all.filter(s => scopeOf(s.name)).map(s => ({ ...s, scope: scopeOf(s.name) })),
+  };
+}
+
+// 「前月の生徒 未入力」の一覧から手で外した人(2026-11-19)
+// 設定の missingDismissed = { months:{ '2026-11':[名前] }, always:[名前] }(どの端末でも同じ。「戻す」で戻せる)
+export async function getMissingDismissed() {
+  const v = (await db.getSetting('missingDismissed')) || {};
+  return { months: v.months || {}, always: v.always || [] };
+}
+
+// 外す(ym を渡すとその月だけ、null なら今後も出さない)
+export async function dismissMissing(name, ym = null) {
+  const before = await getMissingDismissed();
+  const after = structuredClone(before);
+  if (ym) after.months[ym] = [...new Set([...(after.months[ym] || []), name])];
+  else after.always = [...new Set([...after.always, name])];
+  await commit({
+    label: ym ? `${name}を${Number(ym.slice(5))}月の未入力から外す` : `${name}を未入力の一覧に今後出さない`,
+    settings: [{ key: 'missingDismissed', before, after }],
+  });
+}
+
+// 外したのを取り消す(この月だけ外したのも、今後も出さないのも両方)
+export async function undismissMissing(name, ym) {
+  const before = await getMissingDismissed();
+  const after = structuredClone(before);
+  after.always = after.always.filter(n => n !== name);
+  if (after.months[ym]) {
+    after.months[ym] = after.months[ym].filter(n => n !== name);
+    if (!after.months[ym].length) delete after.months[ym];
+  }
+  await commit({ label: `${name}を未入力の一覧に戻す`, settings: [{ key: 'missingDismissed', before, after }] });
 }
 
 // 端末の時計での今日('2026-10-15')
