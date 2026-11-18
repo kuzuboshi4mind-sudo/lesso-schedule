@@ -22,7 +22,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '戻ったら最新に・はじめての名前の知らせ(2026-11-09)';
+const APP_VERSION = '開いたら1か月の表(2026-11-18)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -30,9 +30,11 @@ let current = readMonthFromUrl() || thisMonth();
 let dayNotes = {};
 let shownLessons = [];   // 表に出している予定(ダブルタップの直接入力で使う)
 
-// 表示のしかた:'month'=月の表、'day'=1日ビュー(スマホは開いた瞬間に1日ビュー。今日の1日を大きく)
+// 表示のしかた:'month'=月の表、'day'=1日ビュー(スマホで「1日表示」を押したとき。今日の1日を大きく)
+// 開いたときは、どの端末も月の表(2026-11-18 本人の希望。前はスマホだけ1日ビューで開いていた)
+// ただし1日ビューのまま読み込み直したとき(URL が #2026-11-18 の形)は、1日ビューのまま
 const phoneQuery = window.matchMedia('(max-width: 600px), (max-height: 500px)');
-let viewMode = phoneQuery.matches ? 'day' : 'month';
+let viewMode = phoneQuery.matches && readDayFromUrl() ? 'day' : 'month';
 let selectedDate = readDayFromUrl() || defaultDay();
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const viewToggle = document.getElementById('view-toggle');
