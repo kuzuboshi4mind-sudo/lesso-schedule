@@ -67,7 +67,24 @@ async function allItems() {
   const user = authInst.currentUser;
   if (!user) return null;
   const snap = await fs.getDocs(fs.collection(db, 'users', user.uid, 'items'));
-  items = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(it => (it.text || '').trim());
+  const all = snap.docs.map(d => ({ id: d.id, ...d.data(), text: d.data().text || '', imgs: d.data().imgs || [] }));
+  // 文字のない画像だけの行は、メモアプリで見たときにすぐ上にある行(同じ月・同じフォルダ)の名前のものとする(2026-11-19)
+  // 例:「平田 発表会の曲」の下の行に写真だけを付けた → 平田さんの記録として出す
+  const groups = new Map();
+  for (const it of all) {
+    const key = `${it.m}|${it.f || ''}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  }
+  for (const list of groups.values()) {
+    list.sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0) || (a.t || 0) - (b.t || 0));
+    let last = '';
+    for (const it of list) {
+      if (it.text.trim()) last = headName(it.text);
+      else if (it.imgs.length) it.owner = last;
+    }
+  }
+  items = all.filter(it => it.text.trim() || it.imgs.length);
   loadedAt = Date.now();
   return items;
 }
@@ -76,13 +93,74 @@ async function allItems() {
 // 例:「平田 発表会の曲」→「平田」。「平田さん 発表会」→「平田さん」(平田とは別の人)
 const headName = text => text.trim().split(/[\s　]/)[0];
 
-// 先頭の名前がその生徒の名前と完全に同じ行(新しい順)。つないでいなければ null
+// 先頭の名前がその生徒の名前と完全に同じ行(新しい順)。画像だけの行は、すぐ上の行の名前で見る。つないでいなければ null
 export async function memosFor(name) {
   if (!name || !wasConnected()) return null;
   const list = await allItems();
   if (!list) return null;
   const want = name.trim();
-  return list.filter(it => headName(it.text) === want).sort((a, b) => (b.t || 0) - (a.t || 0));
+  return list.filter(it => (it.text.trim() ? headName(it.text) : it.owner) === want).sort((a, b) => (b.t || 0) - (a.t || 0));
+}
+
+// ---- 画像(メモアプリで付けた写真。2026-11-19)----
+// メモアプリは画像を users/{uid}/images/{id} = { data:縮めた JPEG の data URL, t } に保存し、行には id の一覧(imgs)だけを持つ。
+// ここでは見えたときに1枚ずつ取ってくる(読むだけ)。一度取った画像はこの画面を開いている間おぼえておく
+const imageCache = new Map();
+function imageData(id) {
+  if (!imageCache.has(id)) {
+    imageCache.set(id, (async () => {
+      const { fs, authInst, db } = await load();
+      const user = authInst.currentUser;
+      if (!user) return null;
+      const snap = await fs.getDoc(fs.doc(db, 'users', user.uid, 'images', id));
+      return snap.exists() ? snap.data().data || null : null;
+    })().catch(e => { imageCache.delete(id); throw e; }));
+  }
+  return imageCache.get(id);
+}
+
+// 1行分の画像の見本(小さな四角)。入れたあとに fillImages(入れた場所) を呼ぶと画像が出る
+export function imagesHtml(it) {
+  if (!it.imgs?.length) return '';
+  return `<span class="memoapp-imgs">${it.imgs.map(id =>
+    `<button type="button" class="memoapp-img" data-img="${esc(id)}" aria-label="画像を大きく見る"><span class="memoapp-img-wait">📷</span></button>`).join('')}</span>`;
+}
+
+// 見本の画像を取ってきて出す。タップで大きく見られるようにする
+export function fillImages(container) {
+  for (const btn of container.querySelectorAll('.memoapp-img[data-img]:not([data-filled])')) {
+    btn.dataset.filled = '1';
+    imageData(btn.dataset.img).then(src => {
+      if (!src) { btn.innerHTML = '<span class="memoapp-img-wait" title="画像が見つかりません">？</span>'; return; }
+      const img = document.createElement('img');
+      img.alt = '';
+      img.src = src;
+      btn.replaceChildren(img);
+    }).catch(() => { btn.innerHTML = '<span class="memoapp-img-wait" title="読み込めませんでした">！</span>'; });
+  }
+  if (!container.dataset.imgClick) {
+    container.dataset.imgClick = '1';
+    container.addEventListener('click', e => {
+      const btn = e.target.closest('.memoapp-img[data-img]');
+      if (btn) openViewer(btn.dataset.img);
+    });
+  }
+}
+
+// 画像を大きく見る(入力画面などの上に出すので、dialog で出す)
+let viewer = null;
+async function openViewer(id) {
+  if (!viewer) {
+    viewer = document.createElement('dialog');
+    viewer.className = 'memoapp-viewer';
+    viewer.innerHTML = '<img alt=""><p>タップで閉じる・長押しで写真に保存</p>';
+    viewer.addEventListener('click', () => viewer.close());
+    document.body.appendChild(viewer);
+  }
+  const img = viewer.querySelector('img');
+  img.removeAttribute('src');
+  viewer.showModal();
+  try { img.src = (await imageData(id)) || ''; } catch { viewer.close(); }
 }
 
 // エラーを日本語に
@@ -97,6 +175,11 @@ export function errorText(e) {
 // 「メモアプリの記録」の欄を作る(生徒の画面・予定の入力画面で使う)
 // box:入れる場所、name:生徒の名前、stillCurrent:読み込み中に別の生徒に変わっていないか
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+// 1行分の中身(文字と画像)。画像だけの行は画像だけ
+export function itemBody(it) {
+  const text = it.text?.trim() ? `<span class="memoapp-line">${it.done ? '✓ ' : ''}${esc(it.text)}</span>` : '';
+  return `<span class="memoapp-text">${text}${imagesHtml(it)}</span>`;
+}
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export async function renderInto(box, name, stillCurrent = () => true) {
   if (!name || !wasConnected()) { box.hidden = true; box.innerHTML = ''; return; }
@@ -112,9 +195,10 @@ export async function renderInto(box, name, stillCurrent = () => true) {
       ? `<ul class="memoapp-list">${shown.map(it => {
         const d = new Date(it.t || 0);
         const date = it.t ? `${d.getFullYear() !== thisYear ? `${d.getFullYear()}/` : ''}${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS[d.getDay()]})` : '';
-        return `<li class="${it.done ? 'is-done' : ''}"><span class="memoapp-date">${date}</span><span class="memoapp-text">${it.done ? '✓ ' : ''}${esc(it.text)}</span></li>`;
+        return `<li class="${it.done ? 'is-done' : ''}"><span class="memoapp-date">${date}</span>${itemBody(it)}</li>`;
       }).join('')}</ul>${list.length > shown.length ? `<p class="muted">ほか ${list.length - shown.length}件(古いもの)</p>` : ''}`
       : `<p class="muted">「${esc(name)}」で始まるメモはまだありません</p>`);
+    fillImages(box);
   } catch (e) {
     if (!stillCurrent()) return;
     box.innerHTML = `<h3>メモアプリの記録</h3><p class="muted">${esc(errorText(e))}</p>`;

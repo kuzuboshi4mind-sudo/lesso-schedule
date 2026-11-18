@@ -63,12 +63,12 @@ export async function openDayMemos(date, lessons) {
       html = !memos ? '<p class="muted">メモアプリにログインしていません</p>'
         : memos.length ? `<ul class="memoapp-list">${memos.slice(0, RECENT).map(it => {
           const t = new Date(it.t || 0);
-          return `<li class="${it.done ? 'is-done' : ''}"><span class="memoapp-date">${it.t ? `${t.getMonth() + 1}/${t.getDate()}(${WEEKDAYS[t.getDay()]})` : ''}</span><span class="memoapp-text">${it.done ? '✓ ' : ''}${escapeHtml(it.text)}</span></li>`;
+          return `<li class="${it.done ? 'is-done' : ''}"><span class="memoapp-date">${it.t ? `${t.getMonth() + 1}/${t.getDate()}(${WEEKDAYS[t.getDay()]})` : ''}</span>${memoLink.itemBody(it)}</li>`;
         }).join('')}</ul>`
         : '<p class="muted">なし</p>';
     } catch (e) {
       html = `<p class="muted">${escapeHtml(memoLink.errorText(e))}</p>`;
     }
-    if (openedFor === date && box?.isConnected) box.innerHTML = html;
+    if (openedFor === date && box?.isConnected) { box.innerHTML = html; memoLink.fillImages(box); }
   }));
 }
