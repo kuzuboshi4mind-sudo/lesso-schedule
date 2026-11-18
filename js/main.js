@@ -6,7 +6,7 @@ import { initSelection, afterRender, handleTap, clearSelection } from './selecti
 import { initSettings } from './settings.js';
 import { initZoom, refreshZoom, fitDayHeight } from './zoom.js';
 import { requireLogin, watchLogout, logout } from './login.js';
-import { initTrashBackup, showLastBackup, checkBackupReminder } from './trash-backup.js';
+import { initTrashBackup, showLastBackup } from './trash-backup.js';
 import { initRecurring } from './recurring.js';
 import { initStudents } from './students.js';
 import { initLineShare } from './line-share.js';
@@ -22,7 +22,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = '未入力の一覧から外せる(2026-11-19)';
+const APP_VERSION = 'バックアップの声かけをなくす(2026-11-19)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -358,7 +358,6 @@ async function start() {
   // そのあとで、この端末の写しを作り直す(消したものが写しに残らないように)
   await store.purgeOldTrash().catch(err => console.warn(err));
   await refreshCopy();
-  checkBackupReminder().catch(err => console.warn(err));
 }
 
 start();

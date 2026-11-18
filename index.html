@@ -78,12 +78,6 @@
     <span id="offline-text" class="notice-text"></span>
     <button type="button" id="offline-retry" class="btn btn-small">つなぎ直す</button>
   </div>
-  <!-- 「全部」の書き出しから7日たったときの声かけ(2026-11-09) -->
-  <div id="backup-reminder" class="notice-bar" role="status" hidden>
-    <span id="backup-reminder-text" class="notice-text"></span>
-    <button type="button" id="backup-reminder-export" class="btn btn-small btn-primary">今すぐ書き出す</button>
-    <button type="button" id="backup-reminder-later" class="btn btn-small">あとで</button>
-  </div>
 
   <!-- 月表。この枠の中だけが縦横にスクロールする -->
   <main id="calendar-scroll" class="calendar-scroll">
@@ -247,7 +241,7 @@
 
     <section class="settings-section">
       <h3>バックアップ</h3>
-      <p class="sheet-note">予定をファイルに書き出して、iPad の「ファイル」などに保管できます。書き出したファイルを読み込むと、その内容に戻せます。</p>
+      <p class="sheet-note">予定はアプリの中(クラウドとこの端末の写し)に自動で残ります。iCloud Drive やパソコンにも残したいときは、ここからファイルに書き出してください(保存先を選ぶ画面で「iCloud Drive」などを選びます)。書き出したファイルを読み込むと、その内容に戻せます。</p>
       <p id="last-backup" class="sheet-note"></p>
       <div class="button-row">
         <button type="button" id="export-month" class="btn">表示中の月を書き出す</button>

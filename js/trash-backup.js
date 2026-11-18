@@ -40,14 +40,6 @@ export function initTrashBackup(opts) {
     d.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => d.close()));
   }
   dayCopyList.addEventListener('click', onDayCopyClick);
-  document.getElementById('backup-reminder-export').addEventListener('click', () => {
-    reminder.hidden = true;
-    exportBackup(false);
-  });
-  document.getElementById('backup-reminder-later').addEventListener('click', () => {
-    reminder.hidden = true;
-    try { localStorage.setItem(REMIND_SNOOZE_KEY, String(Date.now())); } catch { /* 覚えられなくても続ける */ }
-  });
   showLastBackup();
 }
 
@@ -70,36 +62,13 @@ export async function showLastBackup() {
   const lines = [];
   if (full) {
     const days = daysSince(full);
-    lines.push(`前回の「全部」の書き出し(どの端末からでも):${shortDate(full)}(${days}日前)${days >= REMIND_DAYS ? ' — そろそろ書き出しておきましょう' : ''}`);
+    lines.push(`前回の「全部」の書き出し(どの端末からでも):${shortDate(full)}(${days}日前)`);
   } else {
-    lines.push('「全部を書き出す」は、まだ一度もしていません。週に1回くらい書き出して、iCloud Drive などに保管しておくと安心です。');
+    lines.push('「全部を書き出す」は、まだしていません(アプリの中の写しとは別に、iCloud Drive やパソコンにも残したいときに使います)。');
   }
   if (at && at !== full) lines.push(`この端末での前回の書き出し:${shortDate(at)}(${daysSince(at)}日前)`);
   lastBackup.textContent = lines.join('\n');
   renderDayCopies();
-}
-
-// ---------------------------------------------------------
-// 「全部」の書き出しから7日たったら、アプリを開いたときに声をかける(「あとで」なら1日おく)
-// ---------------------------------------------------------
-const REMIND_DAYS = 7;
-const REMIND_SNOOZE_KEY = 'lesso.backupRemindSnooze';
-const reminder = document.getElementById('backup-reminder');
-const reminderText = document.getElementById('backup-reminder-text');
-
-export async function checkBackupReminder() {
-  if (store.isOffline()) return;
-  try {
-    const snooze = Number(localStorage.getItem(REMIND_SNOOZE_KEY) || 0);
-    if (Date.now() - snooze < 86400000) return;
-  } catch { /* 読めなければ声をかける */ }
-  const full = await store.lastFullBackupAt();
-  const days = full ? daysSince(full) : null;
-  if (days !== null && days < REMIND_DAYS) return;
-  reminderText.textContent = full
-    ? `前回の「全部」のバックアップから${days}日たちました。書き出して「ファイル」(iCloud Drive)に保存しておきましょう。`
-    : 'まだ「全部」のバックアップを書き出していません。書き出して「ファイル」(iCloud Drive)に保存しておきましょう。';
-  reminder.hidden = false;
 }
 
 // ---------------------------------------------------------
@@ -200,7 +169,7 @@ async function exportBackup(thisMonthOnly) {
   const file = new File([JSON.stringify(data, null, 2)], name, { type: 'application/json' });
   offerFile(file, 'バックアップを保存',
     `${name}(予定${data.lessons.length}件・${data.months.length ? data.months.join('、') : '予定なし'})`,
-    async () => { await store.markBackedUp(!m); reminder.hidden = true; showLastBackup(); });
+    async () => { await store.markBackedUp(!m); showLastBackup(); });
 }
 
 // できたファイルを保存する画面を出す(「ファイルを保存」と、使える端末では「共有…」)
