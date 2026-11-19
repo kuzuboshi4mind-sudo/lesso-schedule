@@ -178,29 +178,37 @@ async function addMonthSheet(workbook, year, month, common) {
     for (const [r, list] of [...byRow].sort((a, b) => a[0] - b[0])) {
       const first = list[0];
       const style = lessonStyle(first, typeById[first.typeId], { tentativeAsConfirmed: !!onlyTypes });
-      // 1件だけで30分より長い予定は、下のマスにつなげる(途中で別の予定が始まらなければ)
+      // 1件だけで30分より長い予定は、下のマスにも続けて塗る(途中で別の予定が始まらなければ)
       let last = r;
       if (list.length === 1) {
         const end = Math.min(SLOTS.length - 1, Math.ceil((toMinutes(first.start) + first.duration - start) / 30) - 1);
         while (last < end && !byRow.has(last + 1) && !used.has(last + 1)) last++;
       }
-      const cell = ws.getRow(HEAD_ROWS + 1 + r).getCell(col);
-      // つなげたマス(60分以上)は名前(長い予定は終わりの時刻も)、1マスに2件は2行
-      cell.value = list.length === 1 && last > r
-        ? [lessonLabel(first), durationLabel(first)].filter(Boolean).join('\n')
-        : list.map(l => [lessonLabel(l), durationLabel(l)].filter(Boolean).join(' ')).join('\n');
-      cell.fill = style.fill;
-      cell.font = { ...style.font, size: list.length > 1 || durationLabel(first) ? 9 : 11 };
-      // 1行の予定は、マスに入りきらなければ文字を小さくして収める
-      cell.alignment = list.length === 1 && last === r
-        ? { vertical: 'middle', horizontal: 'center', shrinkToFit: true }
-        : { vertical: 'middle', horizontal: 'center', wrapText: true };
+      // 30分より長い予定も、マスはつなげずに1マスずつ塗る(2026-11-19 本人の希望。Numbers で1マスずつ直せるように)
+      // 文字:1マス目=名前、2マス目から=名前をくり返す。最後のマスは、半端な長さ(45分など)なら「45」、
+      //       120分より長い予定なら終わりの時刻(「〜22:00」)。1マスに2件は2行
       const border = style.dashed
         ? { top: style.dashed, bottom: style.dashed, left: style.dashed, right: style.dashed }
         : { top: side(COLORS.lineHour), bottom: side(COLORS.lineHour), left: style.leftBorder || side(COLORS.lineHour), right: side(COLORS.lineHour) };
-      cell.border = border;
-      for (let k = r; k <= last; k++) used.add(k);
-      if (last > r) ws.mergeCells(HEAD_ROWS + 1 + r, col, HEAD_ROWS + 1 + last, col);
+      for (let k = r; k <= last; k++) {
+        const cell = ws.getRow(HEAD_ROWS + 1 + k).getCell(col);
+        let text;
+        if (list.length > 1) text = list.map(l => [lessonLabel(l), durationLabel(l)].filter(Boolean).join(' ')).join('\n');
+        else if (k === last && k > r && first.duration % 30) text = String(first.duration);
+        else if (k === last && k > r && durationLabel(first)) text = durationLabel(first);
+        // 下のマスに別の予定があって続けて塗れない半端な長さの予定(45分など)は、同じマスに「名前 45」
+        else if (last === r && first.duration > 30 && first.duration % 30) text = `${lessonLabel(first)} ${first.duration}`;
+        else text = lessonLabel(first);
+        cell.value = text;
+        cell.fill = style.fill;
+        cell.font = { ...style.font, size: list.length > 1 ? 9 : 11 };
+        // 1行の予定は、マスに入りきらなければ文字を小さくして収める
+        cell.alignment = list.length > 1
+          ? { vertical: 'middle', horizontal: 'center', wrapText: true }
+          : { vertical: 'middle', horizontal: 'center', shrinkToFit: true };
+        cell.border = border;
+        used.add(k);
+      }
       // 2件で1マスのときは、2件ぶん見えるように行を少し高く
       if (list.length > 1) ws.getRow(HEAD_ROWS + 1 + r).height = Math.max(ws.getRow(HEAD_ROWS + 1 + r).height || 18, 14 * list.length);
     }
