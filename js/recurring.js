@@ -13,7 +13,10 @@ const STATUS_NAME = { tentative: '仮', confirmed: '確約', absent: '欠席', c
 
 export function initRecurring(opts) {
   onChanged = opts.onChanged;
-  document.getElementById('open-settings').addEventListener('click', renderSlots);
+  document.getElementById('open-settings').addEventListener('click', () => {
+    document.getElementById('slot-details').open = false;   // 設定を開くたびに閉じた状態から
+    renderSlots();
+  });
   list.addEventListener('click', onClick);
   list.addEventListener('change', onEndDateChange);
   document.getElementById('skip-range-btn').addEventListener('click', skipRange);
@@ -27,6 +30,8 @@ function shortDate(date) {
 export async function renderSlots() {
   const [slots, t] = await Promise.all([store.getSlots(), store.getTypes()]);
   types = t;
+  // 一覧はふだん閉じておき、件数だけ見出しに出す(2026-11-19)
+  document.getElementById('slot-summary').textContent = `固定枠の一覧を開く(${slots.length}件)`;
   if (!slots.length) {
     list.innerHTML = '<li class="slot-empty">まだありません。予定の入力画面の「くり返し」で「毎週」「毎月」を選ぶと登録できます。</li>';
     return;

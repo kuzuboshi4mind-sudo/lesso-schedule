@@ -1508,3 +1508,14 @@ body.offline .calendar-scroll { border-top: 4px solid var(--tentative); }
 .memoapp-viewer::backdrop { background: #000; }
 .memoapp-viewer img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
 .memoapp-viewer p { margin: 8px 0 calc(env(safe-area-inset-bottom) + 12px); font-size: 0.85rem; }
+
+/* 固定枠の一覧はふだん閉じておく(2026-11-19) */
+.slot-details > summary {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  border: 1px solid var(--line-strong); border-radius: 22px; background: var(--surface);
+  cursor: pointer; font-weight: 600; list-style: none;
+}
+.slot-details > summary::-webkit-details-marker { display: none; }
+.slot-details > summary::before { content: "▸"; color: var(--muted); }
+.slot-details[open] > summary::before { content: "▾"; }
+.slot-details[open] > summary { margin-bottom: 8px; }
