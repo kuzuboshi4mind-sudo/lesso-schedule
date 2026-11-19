@@ -8,7 +8,7 @@
 //   「予定」の行のメモとマスの色は出さない(自分の予定が入らないように)
 // Excel 形式のファイルを作る部品(ExcelJS)は、書き出すときだけ読み込む
 import * as store from './store.js';
-import { monthDays, markRestDays, timeSlots, toMinutes, fromMinutes, textColorFor, START_HOUR } from './calendar.js';
+import { monthDays, timeSlots, toMinutes, fromMinutes, textColorFor, START_HOUR } from './calendar.js';
 import { computeSummary } from './summary.js';
 
 const EXCELJS_URL = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
@@ -20,11 +20,8 @@ const HEAD_ROWS = 3;              // 日付・曜日・予定 の3行
 const SLOTS = timeSlots();        // 6:00〜23:30 の36行
 const COLORS = {
   head: 'FFE3F1EE',       // 見出しのマス
-  off: 'FFDCF0FA',        // 土日・祝日の列(水色)
-  offStripe: 'FFCBE7F6',  // 土日・祝日の列の1行おき(少し濃い水色。2026-11-19)
   plain: 'FFFFFFFF',      // 空いたマス(白)
   stripe: 'FFF2F2F2',     // 空いたマスの1行おき(薄い灰色。Numbers の表と同じ。2026-11-19)
-  offHead: 'FFC4E6F6',
   note: 'FFFCE3C8',       // 「予定」の行(Numbers と同じオレンジ系)
   line: 'FFD3E2DF',       // 罫線
   lineHour: 'FFA9C4BF',   // 1時間ごとの罫線
@@ -112,8 +109,7 @@ async function addMonthSheet(workbook, year, month, common) {
   const names = new Set(lessons.map(l => l.student));
   const students = onlyTypes ? common.students.filter(st => names.has(st.name)) : common.students;
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
-  // 「予定」の行が「休み」の日も、土日と同じ休みの色にする(2026-11-19。OKI だけのときもメモの文字は出さずに色だけ)
-  const days = markRestDays(monthDays(year, month, new Date(0)), allNotes);
+  const days = monthDays(year, month, new Date(0));
   const ws = workbook.addWorksheet(`${month}月${tentative ? '仮' : ''}`, {
     views: [{ state: 'frozen', xSplit: 1, ySplit: HEAD_ROWS }],
     properties: { defaultRowHeight: 18 },
@@ -128,7 +124,7 @@ async function addMonthSheet(workbook, year, month, common) {
   days.forEach((d, i) => {
     const col = i + 2;
     const color = (d.weekday === 0 || d.holiday) ? COLORS.sun : d.weekday === 6 ? COLORS.sat : COLORS.text;
-    const head = d.isOff ? COLORS.offHead : COLORS.head;
+    const head = COLORS.head;   // 土日祝・「休み」の日も水色にしない(2026-11-19 本人の希望。曜日の文字の色は赤・青のまま)
     Object.assign(rDate.getCell(col), { value: d.day, font: { bold: true, color: { argb: color } }, fill: fill(head) });
     Object.assign(rWeek.getCell(col), { value: WEEKDAYS[d.weekday], font: { color: { argb: color } }, fill: fill(head) });
     const note = notes[d.key] || '';
@@ -136,7 +132,7 @@ async function addMonthSheet(workbook, year, month, common) {
     Object.assign(rNote.getCell(col), {
       value: note || d.holiday || null,
       font: note ? { color: { argb: COLORS.text } } : { size: 8, color: { argb: COLORS.sun } },
-      fill: fill(note ? COLORS.note : d.isOff ? COLORS.off : 'FFF0F7F5'),
+      fill: fill(note ? COLORS.note : 'FFF0F7F5'),
     });
   });
   for (const r of [rDate, rWeek, rNote]) r.getCell(1).fill = fill(COLORS.head);
@@ -156,10 +152,9 @@ async function addMonthSheet(workbook, year, month, common) {
     days.forEach((d, j) => {
       // マスの色(予定とは別に塗った色)があればその色。予定のあるマスは、あとで予定の色になる
       const paint = cellColors[`${d.key}|${time}`];
-      // 空いたマスは1行ごとに白と薄い灰色(土日祝・「休み」の日は水色と少し濃い水色)のしま模様にする(2026-11-19)
+      // 空いたマスは1行ごとに白と薄い灰色のしま模様にする。土日祝・「休み」の日も同じ(水色にしない。2026-11-19 本人の希望)
       const odd = i % 2 === 1;
       if (paint) row.getCell(j + 2).fill = fill(argb(paint));
-      else if (d.isOff) row.getCell(j + 2).fill = fill(odd ? COLORS.offStripe : COLORS.off);
       else row.getCell(j + 2).fill = fill(odd ? COLORS.stripe : COLORS.plain);
     });
   });
