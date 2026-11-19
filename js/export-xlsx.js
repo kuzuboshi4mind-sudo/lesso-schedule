@@ -21,6 +21,9 @@ const SLOTS = timeSlots();        // 6:00〜23:30 の36行
 const COLORS = {
   head: 'FFE3F1EE',       // 見出しのマス
   off: 'FFDCF0FA',        // 土日・祝日の列(水色)
+  offStripe: 'FFCBE7F6',  // 土日・祝日の列の1行おき(少し濃い水色。2026-11-19)
+  plain: 'FFFFFFFF',      // 空いたマス(白)
+  stripe: 'FFF2F2F2',     // 空いたマスの1行おき(薄い灰色。Numbers の表と同じ。2026-11-19)
   offHead: 'FFC4E6F6',
   note: 'FFFCE3C8',       // 「予定」の行(Numbers と同じオレンジ系)
   line: 'FFD3E2DF',       // 罫線
@@ -153,8 +156,11 @@ async function addMonthSheet(workbook, year, month, common) {
     days.forEach((d, j) => {
       // マスの色(予定とは別に塗った色)があればその色。予定のあるマスは、あとで予定の色になる
       const paint = cellColors[`${d.key}|${time}`];
+      // 空いたマスは1行ごとに白と薄い灰色(土日祝・「休み」の日は水色と少し濃い水色)のしま模様にする(2026-11-19)
+      const odd = i % 2 === 1;
       if (paint) row.getCell(j + 2).fill = fill(argb(paint));
-      else if (d.isOff) row.getCell(j + 2).fill = fill(COLORS.off);
+      else if (d.isOff) row.getCell(j + 2).fill = fill(odd ? COLORS.offStripe : COLORS.off);
+      else row.getCell(j + 2).fill = fill(odd ? COLORS.stripe : COLORS.plain);
     });
   });
 
