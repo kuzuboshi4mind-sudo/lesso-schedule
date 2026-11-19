@@ -8,7 +8,7 @@
 //   「予定」の行のメモとマスの色は出さない(自分の予定が入らないように)
 // Excel 形式のファイルを作る部品(ExcelJS)は、書き出すときだけ読み込む
 import * as store from './store.js';
-import { monthDays, timeSlots, toMinutes, fromMinutes, textColorFor, START_HOUR } from './calendar.js';
+import { monthDays, markRestDays, timeSlots, toMinutes, fromMinutes, textColorFor, START_HOUR } from './calendar.js';
 import { computeSummary } from './summary.js';
 
 const EXCELJS_URL = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
@@ -109,7 +109,8 @@ async function addMonthSheet(workbook, year, month, common) {
   const names = new Set(lessons.map(l => l.student));
   const students = onlyTypes ? common.students.filter(st => names.has(st.name)) : common.students;
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
-  const days = monthDays(year, month, new Date(0));
+  // 「予定」の行が「休み」の日も、土日と同じ休みの色にする(2026-11-19。OKI だけのときもメモの文字は出さずに色だけ)
+  const days = markRestDays(monthDays(year, month, new Date(0)), allNotes);
   const ws = workbook.addWorksheet(`${month}月${tentative ? '仮' : ''}`, {
     views: [{ state: 'frozen', xSplit: 1, ySplit: HEAD_ROWS }],
     properties: { defaultRowHeight: 18 },

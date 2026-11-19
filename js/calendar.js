@@ -39,7 +39,20 @@ export function monthDays(year, month, today = new Date()) {
   return days;
 }
 
-// 列ごとの色分け用のクラス名(土日祝=off、今日=today)
+// 「予定」の行(日ごとのメモ)が「休み」の日は、土日と同じ休みの色で1日を塗る(2026-11-19)
+// メモのどれかの行が、空白をのぞいて「休み」「お休み」「夏休み」「冬休み」「春休み」「年末休み」「正月休み」のどれかなら休み
+// (「サンパル休み」のように、ほかの言葉と一緒のときは、その日全部の休みではないので塗らない)
+const REST_LINE = /^(お|夏|冬|春|年末|正月)?休み$/;
+export function isRestNote(text) {
+  return !!text && String(text).split(/\r?\n/).some(line => REST_LINE.test(line.replace(/[\s　]/g, '')));
+}
+// 日付の一覧の休みの印に、「休み」のメモの日も足す
+export function markRestDays(days, dayNotes = {}) {
+  for (const d of days) if (!d.isOff && isRestNote(dayNotes[d.key])) { d.isOff = true; d.isRest = true; }
+  return days;
+}
+
+// 列ごとの色分け用のクラス名(土日祝・「休み」の日=off、今日=today)
 function colClass(d) {
   return [d.isOff && 'off', d.isToday && 'today'].filter(Boolean).join(' ');
 }
@@ -159,7 +172,7 @@ export function renderCalendar(table, year, month, data = {}) {
   const lessons = onlyDate ? (data.lessons || []).filter(l => l.date === onlyDate) : (data.lessons || []);
   const earliest = Math.min(DISPLAY_START_HOUR * 60, ...lessons.map(l => toMinutes(l.start)));
   const firstSlot = `${Math.floor(earliest / 60)}:${earliest % 60 >= 30 ? '30' : '00'}`;
-  const days = monthDays(year, month).filter(d => !onlyDate || d.key === onlyDate);
+  const days = markRestDays(monthDays(year, month), dayNotes).filter(d => !onlyDate || d.key === onlyDate);
   const typeById = Object.fromEntries(types.map(t => [t.id, t]));
 
   // レッスンを「日付|30分のマスの時刻」ごとに分けておく
