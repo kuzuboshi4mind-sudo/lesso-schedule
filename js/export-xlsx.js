@@ -72,9 +72,11 @@ function durationLabel(l) {
 }
 
 // 予定を塗るときの見た目
-function lessonStyle(l, type) {
+// tentativeAsConfirmed:仮の予定も確約と同じ色で塗る(「OKI川口・OKI加茂だけ」の書き出し。2026-11-19 本人の希望)
+function lessonStyle(l, type, { tentativeAsConfirmed = false } = {}) {
   const color = store.lessonColor(l, type);
-  const status = l.status || 'tentative';
+  let status = l.status || 'tentative';
+  if (tentativeAsConfirmed && status === 'tentative') status = 'confirmed';
   // 種類「その他」は種類の色(薄い水色)で塗り、ふつうの文字(アプリの表と同じ)
   if (type?.id === 'other') {
     return { fill: fill(argb(color)), font: { strike: status === 'cancelled', color: { argb: COLORS.text } } };
@@ -173,7 +175,7 @@ async function addMonthSheet(workbook, year, month, common) {
     const used = new Set();   // もう塗ったマス
     for (const [r, list] of [...byRow].sort((a, b) => a[0] - b[0])) {
       const first = list[0];
-      const style = lessonStyle(first, typeById[first.typeId]);
+      const style = lessonStyle(first, typeById[first.typeId], { tentativeAsConfirmed: !!onlyTypes });
       // 1件だけで30分より長い予定は、下のマスにつなげる(途中で別の予定が始まらなければ)
       let last = r;
       if (list.length === 1) {
