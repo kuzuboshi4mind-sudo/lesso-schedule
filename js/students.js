@@ -36,6 +36,7 @@ const f = {
 };
 
 let onChanged = () => {};
+let getMonth = () => null;   // 表示中の月 { year, month }(main.js から受け取る。一覧のまとまりをその月で分ける。2026-11-25)
 let overview = [];     // 一覧の中身(store.getStudentOverview の結果)
 let types = [];
 let hidden = [];       // 削除した生徒の名前
@@ -43,6 +44,7 @@ let editing = null;    // 開いている生徒 { name, id, memo, ... }(新し�
 
 export function initStudents(opts) {
   onChanged = opts.onChanged;
+  if (opts.getMonth) getMonth = opts.getMonth;
   document.getElementById('open-students').addEventListener('click', openList);
   document.getElementById('students-add').addEventListener('click', () => openStudent(null));
   search.addEventListener('input', renderList);
@@ -102,12 +104,12 @@ async function openList() {
 
 // 名前を指定して、その生徒の画面を開く(「前月の生徒」の一覧から。2026-11-09)
 export async function openStudentByName(name) {
-  [overview, types, hidden] = await Promise.all([store.getStudentOverview(), store.getTypes(), store.getHiddenStudents()]);
+  [overview, types, hidden] = await Promise.all([store.getStudentOverview(getMonth()), store.getTypes(), store.getHiddenStudents()]);
   await openStudent(overview.find(s => s.name === name) || { name, id: null, memo: '', slots: [] });
 }
 
 async function loadList() {
-  [overview, types, hidden] = await Promise.all([store.getStudentOverview(), store.getTypes(), store.getHiddenStudents()]);
+  [overview, types, hidden] = await Promise.all([store.getStudentOverview(getMonth()), store.getTypes(), store.getHiddenStudents()]);
   renderList();
   renderHidden();
 }
@@ -126,9 +128,9 @@ function renderList() {
     const next = s.next ? `次:${dateLabel(s.next.date)} ${s.next.start}` : '';
     const badge = s.group === 'todo'
       ? [s.unsentNow.length ? `<span class="student-badge">未送信 ${s.unsentNow.length}件</span>` : '',
-        s.reschedule.length ? `<span class="student-badge reschedule">振替が必要 ${s.reschedule.length}件</span>` : ''].join('')
+        s.rescheduleNow.length ? `<span class="student-badge reschedule">振替が必要 ${s.rescheduleNow.length}件</span>` : ''].join('')
       : s.group === 'waiting'
-        ? `<span class="student-badge waiting">送信済み ${sentLabel(s.sentAt)}・仮 ${s.tentative.length}件</span>`
+        ? `<span class="student-badge waiting">送信済み ${sentLabel(s.sentAt)}・仮 ${s.tentativeNow.length}件</span>`
         : '';
     return `<li>
       <button type="button" class="student-row ${s.group}" data-name="${escapeHtml(s.name)}">
@@ -142,18 +144,19 @@ function renderList() {
       </button>
     </li>`;
   };
-  list.innerHTML = GROUPS.map(g => {
+  const m = getMonth()?.month || new Date().getMonth() + 1;
+  list.innerHTML = groups(m).map(g => {
     const members = hits.filter(s => s.group === g.id);
     if (!members.length) return '';
     return `<li class="student-group"><h3 class="student-group-head ${g.id}">${g.label}(${members.length}人)</h3></li>${members.map(row).join('')}`;
   }).join('');
 }
 
-// 一覧のまとまり(上から順に並べる)
-const GROUPS = [
-  { id: 'todo', label: '連絡が必要:今月の仮の予定をまだ LINE で送っていない・キャンセルの振替が必要' },
-  { id: 'waiting', label: '返事待ち:今月の仮の予定を LINE で送った' },
-  { id: 'confirmed', label: '確定済み:今月の予定は全部確約' },
+// 一覧のまとまり(上から順に並べる)。m は表示中の月(2026-11-25 から、その月で分ける)
+const groups = m => [
+  { id: 'todo', label: `連絡が必要:${m}月の仮の予定をまだ LINE で送っていない・${m}月のキャンセルの振替が必要` },
+  { id: 'waiting', label: `返事待ち:${m}月の仮の予定を LINE で送った` },
+  { id: 'confirmed', label: `確定済み:${m}月に仮の予定はない` },
   { id: 'none', label: 'これからの予定なし' },
 ];
 

@@ -22,7 +22,7 @@ const monthStatus = document.getElementById('month-status');
 const legend = document.getElementById('type-legend');
 
 // アプリの版。更新するたびに変える(設定画面に出して、最新版が表示されているか確かめられるように)
-const APP_VERSION = 'Numbers 書き出しはマスをつなげない(2026-11-19)';
+const APP_VERSION = '生徒の数字は表示中の月で数える(2026-11-25)';
 document.getElementById('app-version').textContent = `アプリの版:${APP_VERSION}`;
 
 // 表示中の年と月(month は 1〜12)
@@ -106,13 +106,18 @@ async function show({ keepScroll = false } = {}) {
   }
 }
 
-// 「👤 生徒」ボタンの数字:仮の予定があって、まだ LINE で送っていない生徒の人数(表を描くのを待たせないよう後ろで数える)
+// 「👤 生徒」ボタンの数字:表示中の月の仮の予定をまだ LINE で送っていない・振替が必要な生徒の人数
+// (表を描くのを待たせないよう後ろで数える。2026-11-25 から表示中の月で数える。12月を見ていれば12月の分)
 const studentsBadge = document.getElementById('students-badge');
+let badgeTicket = 0;
 function updateStudentsBadge() {
-  store.countStudentsToContact().then(n => {
+  const target = { ...current };
+  const my = ++badgeTicket;
+  store.countStudentsToContact(target).then(n => {
+    if (my !== badgeTicket) return;   // 月を続けて切り替えたときは、最後の月の数だけ出す
     studentsBadge.hidden = !n;
     studentsBadge.textContent = n;
-    studentsBadge.title = `連絡が必要な生徒 ${n}人`;
+    studentsBadge.title = `${target.month}月に連絡が必要な生徒 ${n}人`;
   }).catch(() => { studentsBadge.hidden = true; });
 }
 
@@ -254,7 +259,7 @@ initSummary();
 initLineShare({ onChanged: () => show({ keepScroll: true }) });
 initDayMemos();
 dayMemosBtn.addEventListener('click', () => openDayMemos(selectedDate, shownLessons));
-initStudents({ onChanged: () => show({ keepScroll: true }) });
+initStudents({ onChanged: () => show({ keepScroll: true }), getMonth: () => current });
 initMissingStudents({ onChanged: () => show({ keepScroll: true }) });
 
 // 保存やクラウドとの通信に失敗したら、内容を知らせる(気づかないまま消えないように)

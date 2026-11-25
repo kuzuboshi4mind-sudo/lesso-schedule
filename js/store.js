@@ -892,14 +892,20 @@ export async function getStudents() {
 
 // 生徒の一覧(メモ・いつもの種類・次の予定・固定枠つき)
 // 戻り値:[{ name, id, memo, typeId, next:{date,start}|null, slots:[固定枠], count }]
-export async function getStudentOverview() {
+// target={year,month}:「連絡が必要」などのまとまりを、その月で分ける(表示中の月。2026-11-25。省くと今月)
+export async function getStudentOverview(target = null) {
   const today = localToday();
-  const from = addDays(today, -180), to = addDays(today, 92);
+  // まとまりを分ける月(表示中の月)。今月なら今日から月末まで、先の月なら1日から月末まで、過ぎた月は仮の予定を数えない
+  const tY = target?.year || Number(today.slice(0, 4)), tM = target?.month || Number(today.slice(5, 7));
+  const mStart = `${tY}-${String(tM).padStart(2, '0')}-01`;
+  const mEnd = `${tY}-${String(tM).padStart(2, '0')}-${String(new Date(tY, tM, 0).getDate()).padStart(2, '0')}`;
+  const mLower = mStart > today ? mStart : today;
+  const from = addDays(today, -180);
+  const to = [addDays(today, 92), mEnd].sort().at(-1);   // 先の月を見ているときは、その月末まで読む
   // 生徒の画面の仮の予定の一覧は、今月と来月の分(2か月以上先の予定を送ることはまずないため。2026-10-19)
   // 「連絡が必要」かどうかは、今月の分だけで見る(月が変わると来月の仮の予定でいっぱいになるため。2026-11-03)
   const [ty, tm] = today.split('-').map(Number);
   const nextMonthEnd = `${tm === 12 ? ty + 1 : ty}-${String(tm === 12 ? 1 : tm + 1).padStart(2, '0')}-31`;
-  const thisMonthEnd = `${today.slice(0, 7)}-31`;
   // キャンセルした予定は「振替が必要」として、「振替済み」を押すまで残す(30日前から来月末までのキャンセル。2026-11-03)
   const cancelFrom = addDays(today, -30);
   const [students, allLessons, occurrences, allSlots, types, hidden, extras] = await Promise.all([
@@ -917,6 +923,7 @@ export async function getStudentOverview() {
       byName.set(name, {
         name, id: null, memo: '', typeId: null, next: null, slots: [], count: 0, lastDate: '',
         lineName: x.lineName || '', sentAt: x.sentAt || null, tentative: [], unsent: [], reschedule: [],
+        tentativeAll: [], cancelledAll: [],
       });
     }
     return byName.get(name);
@@ -938,30 +945,35 @@ export async function getStudentOverview() {
     if (l.date >= today && status !== 'cancelled') e.count++;
     if (l.date >= today && l.date <= nextMonthEnd && status === 'tentative') e.tentative.push(l);
     if (l.date >= cancelFrom && l.date <= nextMonthEnd && status === 'cancelled') e.reschedule.push(l);
+    if (l.date >= today && status === 'tentative') e.tentativeAll.push(l);
+    if (l.date >= cancelFrom && status === 'cancelled') e.cancelledAll.push(l);
   }
   for (const sl of activeSlots) {
     const e = byName.get(sl.student);
     if (e && !e.typeId) e.typeId = sl.typeId;
   }
-  // まとまり:todo=今月の仮の予定で、まだ LINE で送っていないものがある、または振替が必要なキャンセルがある
-  //          waiting=今月の仮の予定は全部送った(返事待ち) / confirmed=今月の予定は全部確約 / none=これからの予定なし
+  // まとまり:todo=その月の仮の予定で、まだ LINE で送っていないものがある、またはその月のキャンセルで振替が必要なものがある
+  //          waiting=その月の仮の予定は全部送った(返事待ち) / confirmed=その月に仮の予定はない / none=これからの予定なし
+  //          (「その月」は表示中の月。2026-11-25 から。前は今日の月で分けていた)
   for (const e of byName.values()) {
     const sent = new Set((extras[e.name]?.sent || []).map(x => x.id));
     const done = new Set((extras[e.name]?.rescheduled || []).map(x => x.id));
     e.reschedule = e.reschedule.filter(l => !done.has(l.id))
       .sort((a, b) => (a.date + a.start.padStart(5, '0')).localeCompare(b.date + b.start.padStart(5, '0')));
     e.unsent = e.tentative.filter(l => !sent.has(l.id));
-    const nowTentative = e.tentative.filter(l => l.date <= thisMonthEnd);
-    e.unsentNow = e.unsent.filter(l => l.date <= thisMonthEnd);
-    e.group = e.unsentNow.length || e.reschedule.length ? 'todo'
-      : nowTentative.length ? 'waiting' : e.count ? 'confirmed' : 'none';
+    const inMonth = l => l.date >= mLower && l.date <= mEnd;
+    e.tentativeNow = e.tentativeAll.filter(inMonth);
+    e.unsentNow = e.tentativeNow.filter(l => !sent.has(l.id));
+    e.rescheduleNow = e.cancelledAll.filter(l => l.date >= mStart && l.date <= mEnd && !done.has(l.id));
+    e.group = e.unsentNow.length || e.rescheduleNow.length ? 'todo'
+      : e.tentativeNow.length ? 'waiting' : e.count ? 'confirmed' : 'none';
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 }
 
 // 「仮の予定があって、まだ LINE で送っていない」生徒の人数(上の「👤 生徒」ボタンの数字)
-export async function countStudentsToContact() {
-  return (await getStudentOverview()).filter(e => e.group === 'todo').length;
+export async function countStudentsToContact(target = null) {
+  return (await getStudentOverview(target)).filter(e => e.group === 'todo').length;
 }
 
 // ---- 生徒ごとの LINE の情報 ----
